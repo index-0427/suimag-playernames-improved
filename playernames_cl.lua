@@ -1,5 +1,15 @@
 local mpGamerTags = {}
 local mpGamerTagSettings = {}
+local playerNameSettings = {}
+
+local localSettings = {
+    displayName = '',
+    achievement = 'coming_soon',
+    showSelf = true,
+    showOthers = true
+}
+
+local settingsMenuOpen = false
 
 local gtComponent = {
     GAMER_NAME = 0,
@@ -31,6 +41,89 @@ local function makeSettings()
     }
 end
 
+local function removePlayerTag(i)
+    if mpGamerTags[i] then
+        RemoveMpGamerTag(mpGamerTags[i].tag)
+        mpGamerTags[i] = nil
+    end
+end
+
+local function closeSettingsMenu()
+    if not settingsMenuOpen then
+        return
+    end
+
+    settingsMenuOpen = false
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = 'close' })
+end
+
+local function openSettingsMenu()
+    settingsMenuOpen = true
+    SetNuiFocus(true, true)
+    SendNUIMessage({
+        action = 'open',
+        settings = localSettings
+    })
+end
+
+local function normalizeLocalSettings(settings)
+    settings = type(settings) == 'table' and settings or {}
+
+    local displayName = type(settings.displayName) == 'string' and settings.displayName or ''
+    displayName = displayName:gsub('[\r\n\t]', ' '):match('^%s*(.-)%s*$') or ''
+
+    return {
+        displayName = displayName:sub(1, 32),
+        achievement = 'coming_soon',
+        showSelf = settings.showSelf ~= false,
+        showOthers = settings.showOthers ~= false
+    }
+end
+
+RegisterCommand('playernames', openSettingsMenu, false)
+RegisterCommand('namesettings', openSettingsMenu, false)
+
+RegisterNUICallback('close', function(_, cb)
+    closeSettingsMenu()
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('saveSettings', function(data, cb)
+    localSettings = normalizeLocalSettings(data)
+    TriggerServerEvent('playernames:saveSettings', {
+        displayName = localSettings.displayName,
+        achievement = localSettings.achievement
+    })
+
+    closeSettingsMenu()
+    cb({ ok = true })
+end)
+
+RegisterNetEvent('playernames:settingsUpdated')
+AddEventHandler('playernames:settingsUpdated', function(serverId, settings)
+    serverId = tonumber(serverId)
+
+    if not serverId then
+        return
+    end
+
+    if settings == false then
+        playerNameSettings[serverId] = nil
+    else
+        playerNameSettings[serverId] = settings
+
+        if serverId == GetPlayerServerId(PlayerId()) then
+            localSettings.displayName = settings.displayName or ''
+            localSettings.achievement = settings.achievement or 'coming_soon'
+        end
+    end
+
+    for _, settingsForTag in pairs(mpGamerTagSettings) do
+        settingsForTag.rename = true
+    end
+end)
+
 local templateStr
 
 function updatePlayerNames()
@@ -47,8 +140,12 @@ function updatePlayerNames()
 
     -- for each valid player index
     for _, i in ipairs(GetActivePlayers()) do
-        -- if the player exists
-        if i ~= PlayerId() then
+        local isSelf = i == PlayerId()
+        local shouldShow = isSelf and localSettings.showSelf or (not isSelf and localSettings.showOthers)
+
+        if not shouldShow then
+            removePlayerTag(i)
+        else
             -- get their ped
             local ped = GetPlayerPed(i)
             local pedCoords = GetEntityCoords(ped)
@@ -70,7 +167,7 @@ function updatePlayerNames()
 
                 -- store the new tag
                 mpGamerTags[i] = {
-                    tag = CreateMpGamerTag(GetPlayerPed(i), nameTag, false, false, '', 0),
+                    tag = CreateMpGamerTag(ped, nameTag, false, false, '', 0),
                     ped = ped
                 }
             end
@@ -89,7 +186,7 @@ function updatePlayerNames()
 
             -- show/hide based on nearbyness/line-of-sight
             -- nearby checks are primarily to prevent a lot of LOS checks
-            if distance < 250 and HasEntityClearLosToEntity(PlayerPedId(), ped, 17) then
+            if distance < 250 and (isSelf or HasEntityClearLosToEntity(PlayerPedId(), ped, 17)) then
                 SetMpGamerTagVisibility(tag, gtComponent.GAMER_NAME, true)
                 SetMpGamerTagVisibility(tag, gtComponent.healthArmour, IsPlayerTargettingEntity(PlayerId(), ped))
                 SetMpGamerTagVisibility(tag, gtComponent.AUDIO_ICON, NetworkIsPlayerTalking(i))
@@ -124,10 +221,6 @@ function updatePlayerNames()
                 SetMpGamerTagVisibility(tag, gtComponent.healthArmour, false)
                 SetMpGamerTagVisibility(tag, gtComponent.AUDIO_ICON, false)
             end
-        elseif mpGamerTags[i] then
-            RemoveMpGamerTag(mpGamerTags[i].tag)
-
-            mpGamerTags[i] = nil
         end
     end
 end
@@ -173,10 +266,17 @@ end)
 
 AddEventHandler('playernames:extendContext', function(i, cb)
     cb('serverName', getSettings(GetPlayerServerId(i)).serverName)
+
+    if not IsDuplicityVersion() then
+        local settings = playerNameSettings[GetPlayerServerId(i)]
+        cb('displayName', settings and settings.displayName or nil)
+    end
 end)
 
 AddEventHandler('onResourceStop', function(name)
     if name == GetCurrentResourceName() then
+        SetNuiFocus(false, false)
+
         for _, v in pairs(mpGamerTags) do
             RemoveMpGamerTag(v.tag)
         end

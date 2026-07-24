@@ -72,6 +72,10 @@ function formatPlayerNameTag(i, templateStr)
         context[k] = v
     end)
 
+    if not IsDuplicityVersion() and context.displayName and context.displayName ~= '' then
+        context.name = context.displayName
+    end
+
     template.render(templateStr, context, nil, true)
 
     template.print = print

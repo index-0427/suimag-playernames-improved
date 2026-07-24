@@ -28,8 +28,13 @@ server_exports(exportList)
 
 -- add files
 files {
-    'template/template.lua'
+    'template/template.lua',
+    'html/index.html',
+    'html/style.css',
+    'html/app.js'
 }
+
+ui_page 'html/index.html'
 
 -- support the latest resource manifest
 fx_version 'adamant'

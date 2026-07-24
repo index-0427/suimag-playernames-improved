@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>プレイヤー名設定</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app" class="app" aria-hidden="true">
+        <div class="backdrop" data-close="true"></div>
+
+        <main class="panel" role="dialog" aria-modal="true" aria-labelledby="title">
+            <header class="panel-header">
+                <div>
+                    <p class="eyebrow">PLAYER NAMES</p>
+                    <h1 id="title">プレイヤー名設定</h1>
+                    <p class="subtitle">名前の表示方法を設定できます。</p>
+                </div>
+                <button id="close-button" class="icon-button" type="button" aria-label="閉じる">×</button>
+            </header>
+
+            <form id="settings-form">
+                <section class="section">
+                    <label class="field-label" for="display-name">
+                        <span>表示名</span>
+                        <span id="name-counter" class="counter">0 / 32</span>
+                    </label>
+                    <input id="display-name" name="displayName" type="text" maxlength="32" autocomplete="off" placeholder="空欄の場合はゲーム内の名前を使用">
+                    <p class="field-help">他のプレイヤーに表示される名前です。</p>
+                </section>
+
+                <section class="section">
+                    <label class="field-label" for="achievement">実績</label>
+                    <select id="achievement" name="achievement">
+                        <option value="coming_soon">実装乞うご期待！</option>
+                    </select>
+                    <p class="field-help">実績機能は今後のアップデートで追加予定です。</p>
+                </section>
+
+                <section class="section toggle-section" aria-label="名前表示設定">
+                    <div class="field-label">名前表示</div>
+
+                    <label class="toggle-row" for="show-self">
+                        <span class="toggle-copy">
+                            <span class="toggle-title">自分の名前表示</span>
+                            <span class="toggle-help">自分の頭上に名前を表示します。</span>
+                        </span>
+                        <span class="switch">
+                            <input id="show-self" name="showSelf" type="checkbox">
+                            <span class="slider" aria-hidden="true"></span>
+                        </span>
+                    </label>
+
+                    <label class="toggle-row" for="show-others">
+                        <span class="toggle-copy">
+                            <span class="toggle-title">他人の名前表示</span>
+                            <span class="toggle-help">他のプレイヤーの頭上に名前を表示します。</span>
+                        </span>
+                        <span class="switch">
+                            <input id="show-others" name="showOthers" type="checkbox">
+                            <span class="slider" aria-hidden="true"></span>
+                        </span>
+                    </label>
+                </section>
+
+                <footer class="actions">
+                    <button id="cancel-button" class="button button-secondary" type="button">キャンセル</button>
+                    <button class="button button-primary" type="submit">設定を保存</button>
+                </footer>
+            </form>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
