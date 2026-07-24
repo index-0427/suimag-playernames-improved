@@ -291,7 +291,13 @@ AddEventHandler('playernames:extendContext', function(i, cb)
 
     if not IsDuplicityVersion() then
         local settings = playerNameSettings[GetPlayerServerId(i)]
-        cb('displayName', settings and settings.displayName or nil)
+        local displayName = settings and settings.displayName or ''
+
+        if displayName == '' then
+            displayName = GetPlayerName(i)
+        end
+
+        cb('displayName', displayName)
     end
 end)
 
