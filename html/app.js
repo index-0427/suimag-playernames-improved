@@ -1,15 +1,15 @@
-(() => {
+(function () {
     'use strict';
 
-    const app = document.getElementById('app');
-    const form = document.getElementById('settings-form');
-    const displayName = document.getElementById('display-name');
-    const nameCounter = document.getElementById('name-counter');
-    const achievement = document.getElementById('achievement');
-    const showSelf = document.getElementById('show-self');
-    const showOthers = document.getElementById('show-others');
+    var app = document.getElementById('app');
+    var form = document.getElementById('settings-form');
+    var displayName = document.getElementById('display-name');
+    var nameCounter = document.getElementById('name-counter');
+    var achievement = document.getElementById('achievement');
+    var showSelf = document.getElementById('show-self');
+    var showOthers = document.getElementById('show-others');
 
-    const defaults = {
+    var defaults = {
         displayName: '',
         achievement: 'coming_soon',
         showSelf: true,
@@ -20,24 +20,28 @@
         return typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'playernames';
     }
 
-    function post(endpoint, body = {}) {
-        return fetch(`https://${resourceName()}/${endpoint}`, {
+    function post(endpoint, body) {
+        body = body || {};
+
+        return fetch('https://' + resourceName() + '/' + endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json; charset=UTF-8' },
             body: JSON.stringify(body)
-        }).catch(() => undefined);
+        }).catch(function () {
+            return undefined;
+        });
     }
 
     function updateCounter() {
-        nameCounter.textContent = `${displayName.value.length} / 32`;
+        nameCounter.textContent = displayName.value.length + ' / 32';
     }
 
-    function applySettings(settings = {}) {
-        const values = { ...defaults, ...settings };
-        displayName.value = typeof values.displayName === 'string' ? values.displayName.slice(0, 32) : '';
+    function applySettings(settings) {
+        settings = settings || {};
+        displayName.value = typeof settings.displayName === 'string' ? settings.displayName.slice(0, 32) : defaults.displayName;
         achievement.value = 'coming_soon';
-        showSelf.checked = values.showSelf !== false;
-        showOthers.checked = values.showOthers !== false;
+        showSelf.checked = settings.showSelf !== false;
+        showOthers.checked = settings.showOthers !== false;
         updateCounter();
     }
 
@@ -45,10 +49,16 @@
         applySettings(settings);
         app.classList.add('is-open');
         app.setAttribute('aria-hidden', 'false');
-        window.setTimeout(() => displayName.focus(), 0);
+        window.setTimeout(function () {
+            displayName.focus();
+        }, 0);
     }
 
-    function close(notify = true) {
+    function close(notify) {
+        if (notify === undefined) {
+            notify = true;
+        }
+
         app.classList.remove('is-open');
         app.setAttribute('aria-hidden', 'true');
         if (notify) {
@@ -58,7 +68,7 @@
 
     displayName.addEventListener('input', updateCounter);
 
-    form.addEventListener('submit', (event) => {
+    form.addEventListener('submit', function (event) {
         event.preventDefault();
         post('saveSettings', {
             displayName: displayName.value,
@@ -69,18 +79,18 @@
         close(false);
     });
 
-    document.getElementById('close-button').addEventListener('click', () => close());
-    document.getElementById('cancel-button').addEventListener('click', () => close());
-    document.querySelector('.backdrop').addEventListener('click', () => close());
+    document.getElementById('close-button').addEventListener('click', function () { close(); });
+    document.getElementById('cancel-button').addEventListener('click', function () { close(); });
+    document.querySelector('.backdrop').addEventListener('click', function () { close(); });
 
-    document.addEventListener('keydown', (event) => {
+    document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape' && app.classList.contains('is-open')) {
             close();
         }
     });
 
-    window.addEventListener('message', (event) => {
-        const message = event.data || {};
+    window.addEventListener('message', function (event) {
+        var message = event.data || {};
 
         if (message.action === 'open') {
             open(message.settings);
@@ -88,4 +98,8 @@
             close(false);
         }
     });
-})();
+
+    // Let Lua know that the page is ready. This prevents the first open message
+    // from being lost while the NUI document is loading.
+    post('ready');
+}());

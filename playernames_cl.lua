@@ -65,6 +65,17 @@ local function openSettingsMenu()
         action = 'open',
         settings = localSettings
     })
+
+    -- The NUI page may still be initializing on the first command after resource start.
+    -- Send the open message again after it has had a chance to register its listener.
+    SetTimeout(100, function()
+        if settingsMenuOpen then
+            SendNUIMessage({
+                action = 'open',
+                settings = localSettings
+            })
+        end
+    end)
 end
 
 local function normalizeLocalSettings(settings)
@@ -86,6 +97,17 @@ RegisterCommand('namesettings', openSettingsMenu, false)
 
 RegisterNUICallback('close', function(_, cb)
     closeSettingsMenu()
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('ready', function(_, cb)
+    if settingsMenuOpen then
+        SendNUIMessage({
+            action = 'open',
+            settings = localSettings
+        })
+    end
+
     cb({ ok = true })
 end)
 
