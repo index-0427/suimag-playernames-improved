@@ -5,8 +5,8 @@ local playerNameSettings = {}
 local localSettings = {
     displayName = '',
     achievement = 'coming_soon',
-    showSelf = true,
-    showOthers = true
+    showSelf = false,
+    showOthers = false
 }
 
 local settingsMenuOpen = false
@@ -87,8 +87,8 @@ local function normalizeLocalSettings(settings)
     return {
         displayName = displayName:sub(1, 32),
         achievement = 'coming_soon',
-        showSelf = settings.showSelf ~= false,
-        showOthers = settings.showOthers ~= false
+        showSelf = settings.showSelf == true,
+        showOthers = settings.showOthers == true
     }
 end
 

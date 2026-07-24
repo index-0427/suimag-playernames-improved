@@ -12,8 +12,8 @@
     var defaults = {
         displayName: '',
         achievement: 'coming_soon',
-        showSelf: true,
-        showOthers: true
+        showSelf: false,
+        showOthers: false
     };
 
     function resourceName() {
@@ -40,8 +40,8 @@
         settings = settings || {};
         displayName.value = typeof settings.displayName === 'string' ? settings.displayName.slice(0, 32) : defaults.displayName;
         achievement.value = 'coming_soon';
-        showSelf.checked = settings.showSelf !== false;
-        showOthers.checked = settings.showOthers !== false;
+        showSelf.checked = settings.showSelf === true;
+        showOthers.checked = settings.showOthers === true;
         updateCounter();
     }
 

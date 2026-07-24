@@ -44,8 +44,8 @@ local function normalizeSettings(settings)
     return {
         displayName = trimDisplayName(settings.displayName),
         achievement = achievement,
-        showSelf = settings.showSelf ~= false,
-        showOthers = settings.showOthers ~= false
+        showSelf = settings.showSelf == true,
+        showOthers = settings.showOthers == true
     }
 end
 
