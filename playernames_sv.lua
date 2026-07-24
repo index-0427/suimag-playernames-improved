@@ -51,6 +51,17 @@ local function trimDisplayName(value)
     return value:sub(1, 32)
 end
 
+local function trimStatus(value)
+    if type(value) ~= 'string' then
+        return ''
+    end
+
+    value = value:gsub('[\r\n\t]', ' ')
+    value = value:match('^%s*(.-)%s*$') or ''
+
+    return value:sub(1, 32)
+end
+
 local function normalizeSettings(settings)
     settings = type(settings) == 'table' and settings or {}
 
@@ -60,6 +71,7 @@ local function normalizeSettings(settings)
     end
 
     return {
+        status = trimStatus(settings.status),
         displayName = trimDisplayName(settings.displayName),
         achievement = achievement,
         showSelf = settings.showSelf == true,
@@ -98,6 +110,7 @@ end
 
 local function publicSettings(settings)
     return {
+        status = settings.status,
         displayName = settings.displayName,
         achievement = settings.achievement,
         characterName = settings.characterName
@@ -141,7 +154,7 @@ end
 local function detectUpdates()
     SetTimeout(500, detectUpdates)
 
-    local template = GetConvar('playerNames_template', '{{name}}')
+    local template = GetConvar('playerNames_template', '{{statusLine}}{{name}}')
     
     if curTemplate ~= template then
         setNameTemplate(-1, template)

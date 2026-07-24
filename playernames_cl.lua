@@ -3,6 +3,7 @@ local mpGamerTagSettings = {}
 local playerNameSettings = {}
 
 local localSettings = {
+    status = '',
     displayName = '',
     achievement = 'coming_soon',
     showSelf = false,
@@ -81,10 +82,14 @@ end
 local function normalizeLocalSettings(settings)
     settings = type(settings) == 'table' and settings or {}
 
+    local status = type(settings.status) == 'string' and settings.status or ''
+    status = status:gsub('[\r\n\t]', ' '):match('^%s*(.-)%s*$') or ''
+
     local displayName = type(settings.displayName) == 'string' and settings.displayName or ''
     displayName = displayName:gsub('[\r\n\t]', ' '):match('^%s*(.-)%s*$') or ''
 
     return {
+        status = status:sub(1, 32),
         displayName = displayName:sub(1, 32),
         achievement = 'coming_soon',
         showSelf = settings.showSelf == true,
@@ -114,6 +119,7 @@ end)
 RegisterNUICallback('saveSettings', function(data, cb)
     localSettings = normalizeLocalSettings(data)
     TriggerServerEvent('playernames:saveSettings', {
+        status = localSettings.status,
         displayName = localSettings.displayName,
         achievement = localSettings.achievement,
         showSelf = localSettings.showSelf,
@@ -306,6 +312,10 @@ AddEventHandler('playernames:extendContext', function(i, cb)
 
         cb('displayName', displayName)
         cb('characterName', characterName)
+
+        local status = settings and settings.status or ''
+        cb('status', status)
+        cb('statusLine', status ~= '' and (status .. '\n') or '')
     end
 end)
 

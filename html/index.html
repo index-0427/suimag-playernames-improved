@@ -31,6 +31,15 @@
                 </section>
 
                 <section class="section">
+                    <label class="field-label" for="status">
+                        <span>ステータス</span>
+                        <span id="status-counter" class="counter">0 / 32</span>
+                    </label>
+                    <input id="status" name="status" type="text" maxlength="32" autocomplete="off" placeholder="例：作業中">
+                    <p class="field-help">名前の上に表示されるテキストです。</p>
+                </section>
+
+                <section class="section">
                     <label class="field-label" for="achievement">実績</label>
                     <select id="achievement" name="achievement">
                         <option value="coming_soon">実装乞うご期待！</option>

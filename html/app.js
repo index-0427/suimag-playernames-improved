@@ -3,6 +3,8 @@
 
     var app = document.getElementById('app');
     var form = document.getElementById('settings-form');
+    var status = document.getElementById('status');
+    var statusCounter = document.getElementById('status-counter');
     var displayName = document.getElementById('display-name');
     var nameCounter = document.getElementById('name-counter');
     var achievement = document.getElementById('achievement');
@@ -10,6 +12,7 @@
     var showOthers = document.getElementById('show-others');
 
     var defaults = {
+        status: '',
         displayName: '',
         achievement: 'coming_soon',
         showSelf: false,
@@ -33,11 +36,13 @@
     }
 
     function updateCounter() {
+        statusCounter.textContent = status.value.length + ' / 32';
         nameCounter.textContent = displayName.value.length + ' / 32';
     }
 
     function applySettings(settings) {
         settings = settings || {};
+        status.value = typeof settings.status === 'string' ? settings.status.slice(0, 32) : defaults.status;
         displayName.value = typeof settings.displayName === 'string' ? settings.displayName.slice(0, 32) : defaults.displayName;
         achievement.value = 'coming_soon';
         showSelf.checked = settings.showSelf === true;
@@ -50,7 +55,7 @@
         app.classList.add('is-open');
         app.setAttribute('aria-hidden', 'false');
         window.setTimeout(function () {
-            displayName.focus();
+            status.focus();
         }, 0);
     }
 
@@ -66,11 +71,13 @@
         }
     }
 
+    status.addEventListener('input', updateCounter);
     displayName.addEventListener('input', updateCounter);
 
     form.addEventListener('submit', function (event) {
         event.preventDefault();
         post('saveSettings', {
+            status: status.value,
             displayName: displayName.value,
             achievement: achievement.value,
             showSelf: showSelf.checked,
