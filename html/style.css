@@ -49,8 +49,8 @@ button {
 .backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(4, 8, 16, 0.62);
-    backdrop-filter: blur(3px);
+    background: rgba(4, 8, 16, 0.28);
+    backdrop-filter: blur(2px);
 }
 
 .panel {
@@ -58,7 +58,8 @@ button {
     width: min(100%, 510px);
     border: 1px solid rgba(157, 178, 208, 0.2);
     border-radius: 14px;
-    background: #151b25;
+    background: rgba(21, 27, 37, 0.82);
+    backdrop-filter: blur(10px);
     box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
     overflow: hidden;
 }
