@@ -49,8 +49,8 @@ button {
 .backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(4, 8, 16, 0.28);
-    backdrop-filter: blur(2px);
+    background: transparent;
+    backdrop-filter: none;
 }
 
 .panel {
