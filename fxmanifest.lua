@@ -39,3 +39,5 @@ ui_page 'html/index.html'
 -- support the latest resource manifest
 fx_version 'adamant'
 game 'gta5'
+
+dependency 'qbx_core'
