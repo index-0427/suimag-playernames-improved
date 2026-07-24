@@ -115,7 +115,9 @@ RegisterNUICallback('saveSettings', function(data, cb)
     localSettings = normalizeLocalSettings(data)
     TriggerServerEvent('playernames:saveSettings', {
         displayName = localSettings.displayName,
-        achievement = localSettings.achievement
+        achievement = localSettings.achievement,
+        showSelf = localSettings.showSelf,
+        showOthers = localSettings.showOthers
     })
 
     closeSettingsMenu()
@@ -136,8 +138,7 @@ AddEventHandler('playernames:settingsUpdated', function(serverId, settings)
         playerNameSettings[serverId] = settings
 
         if serverId == GetPlayerServerId(PlayerId()) then
-            localSettings.displayName = settings.displayName or ''
-            localSettings.achievement = settings.achievement or 'coming_soon'
+            localSettings = normalizeLocalSettings(settings)
         end
     end
 

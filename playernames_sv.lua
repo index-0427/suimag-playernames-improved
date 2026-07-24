@@ -4,6 +4,24 @@ local curTags = {}
 local activePlayers = {}
 local playerSettings = {}
 
+local function getPersistenceKey(playerId)
+    local identifier = GetPlayerIdentifierByType(playerId, 'license')
+
+    if not identifier then
+        identifier = GetPlayerIdentifierByType(playerId, 'license2')
+    end
+
+    if not identifier then
+        identifier = GetPlayerIdentifierByType(playerId, 'fivem')
+    end
+
+    if not identifier then
+        return nil
+    end
+
+    return ('playernames:%s'):format(identifier:gsub('[^%w_.%-]', '_'))
+end
+
 local function trimDisplayName(value)
     if type(value) ~= 'string' then
         return ''
@@ -25,7 +43,44 @@ local function normalizeSettings(settings)
 
     return {
         displayName = trimDisplayName(settings.displayName),
-        achievement = achievement
+        achievement = achievement,
+        showSelf = settings.showSelf ~= false,
+        showOthers = settings.showOthers ~= false
+    }
+end
+
+local function loadPersistentSettings(playerId)
+    local key = getPersistenceKey(playerId)
+
+    if not key then
+        return normalizeSettings({})
+    end
+
+    local encoded = GetResourceKvpString(key)
+    if not encoded or encoded == '' then
+        return normalizeSettings({})
+    end
+
+    local ok, decoded = pcall(json.decode, encoded)
+    if not ok or type(decoded) ~= 'table' then
+        return normalizeSettings({})
+    end
+
+    return normalizeSettings(decoded)
+end
+
+local function savePersistentSettings(playerId, settings)
+    local key = getPersistenceKey(playerId)
+
+    if key then
+        SetResourceKvp(key, json.encode(settings))
+    end
+end
+
+local function publicSettings(settings)
+    return {
+        displayName = settings.displayName,
+        achievement = settings.achievement
     }
 end
 
@@ -67,11 +122,15 @@ end)
 
 RegisterNetEvent('playernames:init')
 AddEventHandler('playernames:init', function()
-    reconfigure(source)
-    activePlayers[source] = true
+    local playerId = source
+    playerSettings[playerId] = loadPersistentSettings(playerId)
+
+    reconfigure(playerId)
+    activePlayers[playerId] = true
 
     for id, settings in pairs(playerSettings) do
-        TriggerClientEvent('playernames:settingsUpdated', source, id, settings)
+        local data = id == playerId and settings or publicSettings(settings)
+        TriggerClientEvent('playernames:settingsUpdated', playerId, id, data)
     end
 end)
 
@@ -81,7 +140,10 @@ AddEventHandler('playernames:saveSettings', function(settings)
     local normalized = normalizeSettings(settings)
 
     playerSettings[playerId] = normalized
-    TriggerClientEvent('playernames:settingsUpdated', -1, playerId, normalized)
+    savePersistentSettings(playerId, normalized)
+
+    TriggerClientEvent('playernames:settingsUpdated', -1, playerId, publicSettings(normalized))
+    TriggerClientEvent('playernames:settingsUpdated', playerId, playerId, normalized)
 end)
 
 detectUpdates()
