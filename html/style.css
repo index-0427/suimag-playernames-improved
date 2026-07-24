@@ -1,7 +1,6 @@
 :root {
-    color-scheme: dark;
     font-family: "Segoe UI", "Noto Sans JP", sans-serif;
-    background: transparent;
+    background: rgba(0, 0, 0, 0) !important;
     color: #f4f7fb;
 }
 
@@ -15,10 +14,11 @@ body {
     height: 100%;
     margin: 0;
     overflow: hidden;
+    background: rgba(0, 0, 0, 0) !important;
 }
 
 body {
-    background: transparent;
+    background-color: transparent !important;
 }
 
 button,
@@ -39,6 +39,7 @@ button {
     height: 100%;
     place-items: center;
     padding: 24px;
+    background: transparent !important;
 }
 
 .app.is-open {
