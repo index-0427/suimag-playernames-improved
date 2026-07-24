@@ -211,7 +211,7 @@ function updatePlayerNames()
             -- nearby checks are primarily to prevent a lot of LOS checks
             if distance < 250 and (isSelf or HasEntityClearLosToEntity(PlayerPedId(), ped, 17)) then
                 SetMpGamerTagVisibility(tag, gtComponent.GAMER_NAME, true)
-                SetMpGamerTagVisibility(tag, gtComponent.healthArmour, IsPlayerTargettingEntity(PlayerId(), ped))
+                SetMpGamerTagVisibility(tag, gtComponent.healthArmour, false)
                 SetMpGamerTagVisibility(tag, gtComponent.AUDIO_ICON, NetworkIsPlayerTalking(i))
 
                 SetMpGamerTagAlpha(tag, gtComponent.AUDIO_ICON, 255)
