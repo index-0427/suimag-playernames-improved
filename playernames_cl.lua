@@ -297,11 +297,21 @@ end)
 
 AddEventHandler('onResourceStop', function(name)
     if name == GetCurrentResourceName() then
+        settingsMenuOpen = false
+        SendNUIMessage({ action = 'close' })
         SetNuiFocus(false, false)
 
         for _, v in pairs(mpGamerTags) do
             RemoveMpGamerTag(v.tag)
         end
+    end
+end)
+
+AddEventHandler('onClientResourceStart', function(name)
+    if name == GetCurrentResourceName() then
+        settingsMenuOpen = false
+        SetNuiFocus(false, false)
+        SendNUIMessage({ action = 'close' })
     end
 end)
 
