@@ -76,6 +76,12 @@ function formatPlayerNameTag(i, templateStr)
         context.name = context.displayName
     end
 
+    -- Status is rendered by the BIG_TEXT gamer-tag component so the name and
+    -- status can be coloured independently. Keep it out of the name template.
+    if not IsDuplicityVersion() then
+        context.statusLine = ''
+    end
+
     template.render(templateStr, context, nil, true)
 
     template.print = print

@@ -1,16 +1,58 @@
 local mpGamerTags = {}
 local mpGamerTagSettings = {}
+local playerNameRuntime = {}
 local playerNameSettings = {}
+local playerIndexByServerId = {}
+
+local ACTIVE_PLAYERS_INTERVAL = 250
+local TAG_CHECK_INTERVAL = 250
+local DISTANCE_INTERVAL = 100
+local LOS_INTERVAL = 125
+local VOICE_INTERVAL = 50
+local IDLE_UPDATE_INTERVAL = 500
+local ACTIVE_UPDATE_INTERVAL = 50
+local DISPLAY_DISTANCE_SQUARED = 250.0 * 250.0
+local STATUS_HEIGHT_OFFSET = 1.15
+local STATUS_TEXT_SCALE_MAX = 0.38
+local STATUS_TEXT_SCALE_MIN = 0.24
+local STATUS_TEXT_SCALE_RATIO = 0.82
+local LABEL_LINE_SPACING = 0.018
+local LABEL_SCREEN_SMOOTHING = 0.35
+local LABEL_SCREEN_SNAP_DISTANCE_SQUARED = 0.04
+
+local activePlayers = {}
+local activePlayerSet = {}
+local playerLabelDrawEntries = {}
+local nextActivePlayersRefresh = 0
+local nextDistanceUpdate = 0
+local nextVoiceUpdate = 0
+local updateScheduleId = 0
 
 local localSettings = {
     status = '',
+    statusColor = 'white',
     displayName = '',
+    nameColor = 'white',
     achievement = 'coming_soon',
     showSelf = false,
     showOthers = false
 }
 
+local textColors = {
+    white = { hud = 1, red = 240, green = 240, blue = 240 },
+    red = { hud = 6, red = 224, green = 50, blue = 50 },
+    blue = { hud = 9, red = 93, green = 182, blue = 229 },
+    yellow = { hud = 12, red = 240, green = 200, blue = 80 },
+    orange = { hud = 15, red = 255, green = 133, blue = 85 },
+    green = { hud = 18, red = 114, green = 204, blue = 114 },
+    purple = { hud = 21, red = 132, green = 102, blue = 226 },
+    pink = { hud = 24, red = 203, green = 54, blue = 148 },
+    gray = { hud = 67, red = 140, green = 140, blue = 140 }
+}
+
 local settingsMenuOpen = false
+local updatePlayerNames
+local scheduleNextUpdate
 
 local gtComponent = {
     GAMER_NAME = 0,
@@ -32,8 +74,9 @@ local gtComponent = {
     MP_TYPING = 16
 }
 
-local function makeSettings()
+local function makeSettings(serverId)
     return {
+        serverId = serverId,
         alphas = {},
         colors = {},
         healthColor = false,
@@ -42,10 +85,83 @@ local function makeSettings()
     }
 end
 
+local function makeRuntime(serverId)
+    return {
+        serverId = serverId,
+        ped = nil,
+        distanceSquared = math.huge,
+        hasDistance = false,
+        hasLos = false,
+        los = false,
+        talking = false,
+        lastVisible = false,
+        name = '',
+        status = '',
+        statusColor = textColors.white,
+        nameColor = textColors.white,
+        drawX = nil,
+        drawY = nil,
+        nextTagCheck = 0,
+        nextLosCheck = 0,
+        applied = {
+            visibility = {},
+            alphas = {},
+            colors = {},
+            wantedLevel = nil,
+            healthColor = nil
+        }
+    }
+end
+
+local function resetRuntime(i)
+    playerNameRuntime[i] = nil
+end
+
+local function getBoundServerId(i)
+    local settings = mpGamerTagSettings[i]
+    if settings and settings.serverId then
+        return settings.serverId
+    end
+
+    local runtime = playerNameRuntime[i]
+    if runtime and runtime.serverId then
+        return runtime.serverId
+    end
+
+    local gamerTag = mpGamerTags[i]
+    return gamerTag and gamerTag.serverId
+end
+
 local function removePlayerTag(i)
     if mpGamerTags[i] then
         RemoveMpGamerTag(mpGamerTags[i].tag)
         mpGamerTags[i] = nil
+    end
+
+    resetRuntime(i)
+end
+
+local function removePlayerState(i)
+    removePlayerTag(i)
+    mpGamerTagSettings[i] = nil
+
+    for serverId, playerIndex in pairs(playerIndexByServerId) do
+        if playerIndex == i then
+            playerIndexByServerId[serverId] = nil
+        end
+    end
+end
+
+local function removeHiddenPlayerTags()
+    local localPlayer = PlayerId()
+
+    for i in pairs(mpGamerTags) do
+        local isSelf = i == localPlayer
+        local shouldShow = isSelf and localSettings.showSelf or (not isSelf and localSettings.showOthers)
+
+        if not shouldShow then
+            removePlayerTag(i)
+        end
     end
 end
 
@@ -88,9 +204,23 @@ local function normalizeLocalSettings(settings)
     local displayName = type(settings.displayName) == 'string' and settings.displayName or ''
     displayName = displayName:gsub('[\r\n\t]', ' '):match('^%s*(.-)%s*$') or ''
 
+    local statusColor = textColors[settings.statusColor] and settings.statusColor or 'white'
+    local nameColor = textColors[settings.nameColor] and settings.nameColor or 'white'
+
+    local function truncateUtf8(value, maxCharacters)
+        local ok, nextByte = pcall(utf8.offset, value, maxCharacters + 1)
+        if ok and nextByte then
+            return value:sub(1, nextByte - 1)
+        end
+
+        return ok and value or value:sub(1, maxCharacters)
+    end
+
     return {
-        status = status:sub(1, 32),
-        displayName = displayName:sub(1, 32),
+        status = truncateUtf8(status, 32),
+        statusColor = statusColor,
+        displayName = truncateUtf8(displayName, 32),
+        nameColor = nameColor,
         achievement = 'coming_soon',
         showSelf = settings.showSelf == true,
         showOthers = settings.showOthers == true
@@ -120,11 +250,20 @@ RegisterNUICallback('saveSettings', function(data, cb)
     localSettings = normalizeLocalSettings(data)
     TriggerServerEvent('playernames:saveSettings', {
         status = localSettings.status,
+        statusColor = localSettings.statusColor,
         displayName = localSettings.displayName,
+        nameColor = localSettings.nameColor,
         achievement = localSettings.achievement,
         showSelf = localSettings.showSelf,
         showOthers = localSettings.showOthers
     })
+
+    -- Hide tags immediately when the display mode changes instead of waiting
+    -- for the next maintenance pass.
+    removeHiddenPlayerTags()
+    if scheduleNextUpdate then
+        scheduleNextUpdate(0)
+    end
 
     closeSettingsMenu()
     cb({ ok = true })
@@ -138,127 +277,559 @@ AddEventHandler('playernames:settingsUpdated', function(serverId, settings)
         return
     end
 
+    local playerIndex = GetPlayerFromServerId(serverId)
+
     if settings == false then
         playerNameSettings[serverId] = nil
+
+        -- The server sends this for a dropped player. Remove the tag and all
+        -- slot-indexed state immediately, before the next active-player scan.
+        if not playerIndex or playerIndex < 0 then
+            playerIndex = playerIndexByServerId[serverId]
+        end
+
+        if playerIndex and getBoundServerId(playerIndex) == serverId then
+            removePlayerState(playerIndex)
+        end
+
+        playerIndexByServerId[serverId] = nil
     else
         playerNameSettings[serverId] = settings
 
         if serverId == GetPlayerServerId(PlayerId()) then
-            localSettings = normalizeLocalSettings(settings)
+            local previousShowSelf = localSettings.showSelf
+            local previousShowOthers = localSettings.showOthers
+            local normalized = normalizeLocalSettings(settings)
+
+            -- Public settings are also broadcast back to their owner, but do
+            -- not contain the private visibility flags. Preserve the current
+            -- values until the owner-only settings event arrives.
+            if settings.showSelf == nil then
+                normalized.showSelf = previousShowSelf
+            end
+
+            if settings.showOthers == nil then
+                normalized.showOthers = previousShowOthers
+            end
+
+            localSettings = normalized
+
+            if localSettings.showSelf ~= previousShowSelf
+                or localSettings.showOthers ~= previousShowOthers then
+                removeHiddenPlayerTags()
+            end
+        end
+
+        -- Only the tag belonging to the changed server ID needs a rename.
+        if playerIndex and playerIndex >= 0 and mpGamerTagSettings[playerIndex] then
+            mpGamerTagSettings[playerIndex].rename = true
         end
     end
 
-    for _, settingsForTag in pairs(mpGamerTagSettings) do
-        settingsForTag.rename = true
+    if scheduleNextUpdate then
+        scheduleNextUpdate(0)
     end
 end)
 
 local templateStr
 
-function updatePlayerNames()
-    -- re-run this function the next frame
-    SetTimeout(0, updatePlayerNames)
+local function refreshActivePlayers(now)
+    activePlayers = GetActivePlayers()
+    activePlayerSet = {}
+    local refreshedPlayerIndexByServerId = {}
 
-    -- return if no template string is set
-    if not templateStr then
+    for _, i in ipairs(activePlayers) do
+        activePlayerSet[i] = true
+
+        local serverId = GetPlayerServerId(i)
+        if serverId and serverId >= 0 then
+            local boundServerId = getBoundServerId(i)
+
+            -- The index may have stayed active while being reassigned between
+            -- maintenance passes. Treat an ID change as a completely new slot.
+            if boundServerId and boundServerId ~= serverId then
+                removePlayerState(i)
+            end
+
+            refreshedPlayerIndexByServerId[serverId] = i
+        end
+    end
+
+    -- A client index can be reused. Remove every cache associated with an
+    -- index which is no longer active before it can be assigned to someone else.
+    for i in pairs(mpGamerTags) do
+        if not activePlayerSet[i] then
+            removePlayerState(i)
+        end
+    end
+
+    for i in pairs(mpGamerTagSettings) do
+        if not activePlayerSet[i] then
+            removePlayerState(i)
+        end
+    end
+
+    for i in pairs(playerNameRuntime) do
+        if not activePlayerSet[i] then
+            resetRuntime(i)
+        end
+    end
+
+    playerIndexByServerId = refreshedPlayerIndexByServerId
+    nextActivePlayersRefresh = now + ACTIVE_PLAYERS_INTERVAL
+end
+
+local function resetAppliedState(runtime)
+    runtime.applied = {
+        visibility = {},
+        alphas = {},
+        colors = {},
+        wantedLevel = nil,
+        healthColor = nil
+    }
+end
+
+local function getPlayerTextPresentation(i)
+    local settings = playerNameSettings[GetPlayerServerId(i)] or {}
+    local status = type(settings.status) == 'string' and settings.status or ''
+    local statusColor = textColors[settings.statusColor] or textColors.white
+    local nameColor = textColors[settings.nameColor] or textColors.white
+
+    return status, statusColor, nameColor
+end
+
+local function ensurePlayerTag(i, ped, now, shouldCheckPed)
+    local serverId = GetPlayerServerId(i)
+    if not serverId or serverId < 0 then
+        return nil, nil, nil
+    end
+
+    local boundServerId = getBoundServerId(i)
+    if boundServerId and boundServerId ~= serverId then
+        removePlayerState(i)
+    end
+
+    playerIndexByServerId[serverId] = i
+
+    local settings = mpGamerTagSettings[i]
+    if not settings then
+        settings = makeSettings(serverId)
+        mpGamerTagSettings[i] = settings
+    end
+
+    local runtime = playerNameRuntime[i]
+    if not runtime then
+        runtime = makeRuntime(serverId)
+        playerNameRuntime[i] = runtime
+    end
+
+    if shouldCheckPed then
+        if not ped then
+            ped = GetPlayerPed(i)
+        end
+
+        runtime.ped = ped
+        runtime.nextTagCheck = now + TAG_CHECK_INTERVAL
+    else
+        ped = runtime.ped
+    end
+
+    if not ped or ped == 0 then
+        if mpGamerTags[i] then
+            removePlayerTag(i)
+        end
+
+        return nil, runtime, settings
+    end
+
+    local gamerTag = mpGamerTags[i]
+    local needsNewTag = not gamerTag or gamerTag.ped ~= ped
+
+    if gamerTag and shouldCheckPed and not IsMpGamerTagActive(gamerTag.tag) then
+        needsNewTag = true
+    end
+
+    if needsNewTag then
+        if gamerTag then
+            RemoveMpGamerTag(gamerTag.tag)
+        end
+
+        gamerTag = {
+            tag = CreateMpGamerTag(ped, '', false, false, '', 0),
+            ped = ped,
+            serverId = serverId
+        }
+
+        mpGamerTags[i] = gamerTag
+        runtime.ped = ped
+        runtime.hasDistance = false
+        runtime.hasLos = false
+        runtime.los = false
+        runtime.talking = false
+        runtime.lastVisible = false
+        runtime.nextLosCheck = now
+        runtime.name = formatPlayerNameTag(i, templateStr)
+        runtime.status, runtime.statusColor, runtime.nameColor = getPlayerTextPresentation(i)
+        runtime.drawX = nil
+        runtime.drawY = nil
+        SetMpGamerTagBigText(gamerTag.tag, '')
+        resetAppliedState(runtime)
+
+        -- The visible name is drawn by the custom renderer. The native tag is
+        -- retained only for components such as the voice icon.
+        settings.rename = nil
+    end
+
+    return gamerTag, runtime, settings
+end
+
+local function getComponentId(key)
+    if type(key) == 'number' then
+        return key
+    end
+
+    return gtComponent[key]
+end
+
+local function applyDesiredState(tag, runtime, settings, isVisible)
+    local applied = runtime.applied
+    local desiredVisibility = {}
+
+    -- Start from an explicit hidden state for every component previously
+    -- touched by this resource. This also clears removed overrides and prevents
+    -- custom components from remaining visible through distance or LOS changes.
+    for component in pairs(applied.visibility) do
+        desiredVisibility[component] = false
+    end
+
+    desiredVisibility[gtComponent.GAMER_NAME] = false
+    desiredVisibility[gtComponent.healthArmour] = false
+    desiredVisibility[gtComponent.BIG_TEXT] = false
+    desiredVisibility[gtComponent.AUDIO_ICON] = isVisible and runtime.talking or false
+
+    local desiredAlphas = {}
+    local desiredColors = {}
+
+    if isVisible then
+        desiredAlphas[gtComponent.AUDIO_ICON] = 255
+        desiredAlphas[gtComponent.healthArmour] = 255
+        for key, value in pairs(settings.toggles) do
+            local component = getComponentId(key)
+            if component ~= nil then
+                desiredVisibility[component] = value
+            end
+        end
+
+        for key, value in pairs(settings.alphas) do
+            local component = getComponentId(key)
+            if component ~= nil then
+                desiredAlphas[component] = value
+            end
+        end
+
+        for key, value in pairs(settings.colors) do
+            local component = getComponentId(key)
+            if component ~= nil then
+                desiredColors[component] = value
+            end
+        end
+    end
+
+    -- Do not let component overrides re-enable the blank native name or the
+    -- legacy big-text status component.
+    desiredVisibility[gtComponent.GAMER_NAME] = false
+    desiredVisibility[gtComponent.BIG_TEXT] = false
+
+    for component, value in pairs(desiredVisibility) do
+        if applied.visibility[component] ~= value then
+            SetMpGamerTagVisibility(tag, component, value)
+            applied.visibility[component] = value
+        end
+    end
+
+    for component, value in pairs(desiredAlphas) do
+        if applied.alphas[component] ~= value then
+            SetMpGamerTagAlpha(tag, component, value)
+            applied.alphas[component] = value
+        end
+    end
+
+    for component, value in pairs(desiredColors) do
+        if applied.colors[component] ~= value then
+            SetMpGamerTagColour(tag, component, value)
+            applied.colors[component] = value
+        end
+    end
+
+    if isVisible and settings.wantedLevel and applied.wantedLevel ~= settings.wantedLevel then
+        SetMpGamerTagWantedLevel(tag, settings.wantedLevel)
+        applied.wantedLevel = settings.wantedLevel
+    end
+
+    if isVisible and settings.healthColor and applied.healthColor ~= settings.healthColor then
+        SetMpGamerTagHealthBarColour(tag, settings.healthColor)
+        applied.healthColor = settings.healthColor
+    end
+end
+
+local function applyPendingRename(i, tag, runtime, settings)
+    if settings.rename then
+        runtime.name = formatPlayerNameTag(i, templateStr)
+        SetMpGamerTagName(tag, '')
+        runtime.status, runtime.statusColor, runtime.nameColor = getPlayerTextPresentation(i)
+        SetMpGamerTagBigText(tag, '')
+        settings.rename = nil
+    end
+end
+
+local function drawPlayerLabelLine(text, screenX, screenY, scale, color)
+    if not text or text == '' then
         return
     end
 
-    -- get local coordinates to compare to
-    local localCoords = GetEntityCoords(PlayerPedId())
+    SetTextScale(0.0, scale)
+    SetTextFont(0)
+    SetTextProportional(true)
+    SetTextCentre(true)
+    SetTextColour(color.red, color.green, color.blue, 255)
+    SetTextOutline()
+    BeginTextCommandDisplayText('STRING')
+    AddTextComponentSubstringPlayerName(text)
+    EndTextCommandDisplayText(screenX, screenY)
+end
 
-    -- for each valid player index
-    for _, i in ipairs(GetActivePlayers()) do
-        local isSelf = i == PlayerId()
+local function drawPlayerLabel(entry)
+    if not DoesEntityExist(entry.ped) then
+        return
+    end
+
+    local coords = GetEntityCoords(entry.ped)
+    local onScreen, screenX, screenY = GetScreenCoordFromWorldCoord(
+        coords.x,
+        coords.y,
+        coords.z + STATUS_HEIGHT_OFFSET
+    )
+
+    if not onScreen then
+        entry.runtime.drawX = nil
+        entry.runtime.drawY = nil
+        return
+    end
+
+    local runtime = entry.runtime
+
+    if runtime.drawX and runtime.drawY then
+        local dx = screenX - runtime.drawX
+        local dy = screenY - runtime.drawY
+
+        if dx * dx + dy * dy > LABEL_SCREEN_SNAP_DISTANCE_SQUARED then
+            runtime.drawX = screenX
+            runtime.drawY = screenY
+        else
+            runtime.drawX = runtime.drawX + dx * LABEL_SCREEN_SMOOTHING
+            runtime.drawY = runtime.drawY + dy * LABEL_SCREEN_SMOOTHING
+        end
+    else
+        runtime.drawX = screenX
+        runtime.drawY = screenY
+    end
+
+    local distance = math.sqrt(entry.distanceSquared)
+    local scale = STATUS_TEXT_SCALE_MAX - math.max(distance - 25.0, 0.0) * 0.00065
+    scale = math.max(STATUS_TEXT_SCALE_MIN, scale)
+    local lineSpacing = LABEL_LINE_SPACING * (scale / STATUS_TEXT_SCALE_MAX)
+
+    if entry.status ~= '' then
+        drawPlayerLabelLine(
+            entry.status,
+            runtime.drawX,
+            runtime.drawY,
+            scale * STATUS_TEXT_SCALE_RATIO,
+            entry.statusColor
+        )
+        drawPlayerLabelLine(
+            entry.name,
+            runtime.drawX,
+            runtime.drawY + lineSpacing,
+            scale,
+            entry.nameColor
+        )
+    else
+        drawPlayerLabelLine(entry.name, runtime.drawX, runtime.drawY, scale, entry.nameColor)
+    end
+end
+
+local function renderPlayerLabels()
+    local entries = playerLabelDrawEntries
+
+    for _, entry in ipairs(entries) do
+        drawPlayerLabel(entry)
+    end
+
+    SetTimeout(#entries > 0 and 0 or 250, renderPlayerLabels)
+end
+
+local function updatePlayerNamesImpl()
+    local now = GetGameTimer()
+    local showAny = localSettings.showSelf or localSettings.showOthers
+    local nextDelay = templateStr and showAny and ACTIVE_UPDATE_INTERVAL or IDLE_UPDATE_INTERVAL
+
+    -- Reserve the next pass before any template, event, or Native work. A
+    -- transient error in the current pass must not permanently stop updates.
+    scheduleNextUpdate(nextDelay)
+
+    if now >= nextActivePlayersRefresh then
+        refreshActivePlayers(now)
+    end
+
+    -- Keep this loop alive at a low rate while disabled, but do not perform
+    -- player/ped/LOS work until a display option is enabled.
+    if not templateStr or not showAny then
+        playerLabelDrawEntries = {}
+        return
+    end
+
+    local localPlayer = PlayerId()
+    local localPed = PlayerPedId()
+    local localCoords
+    local updateDistance = now >= nextDistanceUpdate
+    local updateVoice = now >= nextVoiceUpdate
+
+    if updateDistance then
+        nextDistanceUpdate = now + DISTANCE_INTERVAL
+    end
+
+    if updateVoice then
+        nextVoiceUpdate = now + VOICE_INTERVAL
+    end
+
+    local nextPlayerLabelDrawEntries = {}
+
+    for _, i in ipairs(activePlayers) do
+        local isSelf = i == localPlayer
         local shouldShow = isSelf and localSettings.showSelf or (not isSelf and localSettings.showOthers)
 
         if not shouldShow then
             removePlayerTag(i)
         else
-            -- get their ped
-            local ped = GetPlayerPed(i)
-            local pedCoords = GetEntityCoords(ped)
+            local runtime = playerNameRuntime[i]
+            local shouldCheckPed = not runtime or now >= runtime.nextTagCheck
 
-            -- make a new settings list if needed
-            if not mpGamerTagSettings[i] then
-                mpGamerTagSettings[i] = makeSettings()
+            if isSelf and runtime and runtime.ped ~= localPed then
+                shouldCheckPed = true
             end
 
-            -- check the ped, because changing player models may recreate the ped
-            -- also check gamer tag activity in case the game deleted the gamer tag
-            if not mpGamerTags[i] or mpGamerTags[i].ped ~= ped or not IsMpGamerTagActive(mpGamerTags[i].tag) then
-                local nameTag = formatPlayerNameTag(i, templateStr)
+            local gamerTag
+            gamerTag, runtime = ensurePlayerTag(i, isSelf and localPed or nil, now, shouldCheckPed)
 
-                -- remove any existing tag
-                if mpGamerTags[i] then
-                    RemoveMpGamerTag(mpGamerTags[i].tag)
-                end
-
-                -- store the new tag
-                mpGamerTags[i] = {
-                    tag = CreateMpGamerTag(ped, nameTag, false, false, '', 0),
-                    ped = ped
-                }
-            end
-
-            -- store the tag in a local
-            local tag = mpGamerTags[i].tag
-
-            -- should the player be renamed? this is set by events
-            if mpGamerTagSettings[i].rename then
-                SetMpGamerTagName(tag, formatPlayerNameTag(i, templateStr))
-                mpGamerTagSettings[i].rename = nil
-            end
-
-            -- check distance
-            local distance = #(pedCoords - localCoords)
-
-            -- show/hide based on nearbyness/line-of-sight
-            -- nearby checks are primarily to prevent a lot of LOS checks
-            if distance < 250 and (isSelf or HasEntityClearLosToEntity(PlayerPedId(), ped, 17)) then
-                SetMpGamerTagVisibility(tag, gtComponent.GAMER_NAME, true)
-                SetMpGamerTagVisibility(tag, gtComponent.healthArmour, false)
-                SetMpGamerTagVisibility(tag, gtComponent.AUDIO_ICON, NetworkIsPlayerTalking(i))
-
-                SetMpGamerTagAlpha(tag, gtComponent.AUDIO_ICON, 255)
-                SetMpGamerTagAlpha(tag, gtComponent.healthArmour, 255)
-
-                -- override settings
+            if gamerTag then
                 local settings = mpGamerTagSettings[i]
+                applyPendingRename(i, gamerTag.tag, runtime, settings)
 
-                for k, v in pairs(settings.toggles) do
-                    SetMpGamerTagVisibility(tag, gtComponent[k], v)
+                if updateDistance or not runtime.hasDistance then
+                    if not localCoords then
+                        localCoords = GetEntityCoords(localPed)
+                    end
+
+                    local pedCoords = GetEntityCoords(runtime.ped)
+                    local dx = pedCoords.x - localCoords.x
+                    local dy = pedCoords.y - localCoords.y
+                    local dz = pedCoords.z - localCoords.z
+
+                    runtime.distanceSquared = dx * dx + dy * dy + dz * dz
+                    runtime.hasDistance = true
                 end
 
-                for k, v in pairs(settings.alphas) do
-                    SetMpGamerTagAlpha(tag, gtComponent[k], v)
+                local isNearby = runtime.hasDistance and runtime.distanceSquared < DISPLAY_DISTANCE_SQUARED
+
+                if isNearby then
+                    if isSelf then
+                        runtime.hasLos = true
+                        runtime.los = true
+                    elseif now >= runtime.nextLosCheck or not runtime.hasLos then
+                        runtime.los = HasEntityClearLosToEntity(localPed, runtime.ped, 17)
+                        runtime.hasLos = true
+                        runtime.nextLosCheck = now + LOS_INTERVAL
+                    end
+                else
+                    runtime.hasLos = true
+                    runtime.los = false
+                    runtime.nextLosCheck = now + LOS_INTERVAL
                 end
 
-                for k, v in pairs(settings.colors) do
-                    SetMpGamerTagColour(tag, gtComponent[k], v)
+                local isVisible = isNearby and (isSelf or runtime.los)
+
+                if isVisible and (updateVoice or not runtime.lastVisible) then
+                    runtime.talking = NetworkIsPlayerTalking(i)
+                elseif not isVisible then
+                    runtime.talking = false
                 end
 
-                if settings.wantedLevel then
-                    SetMpGamerTagWantedLevel(tag, settings.wantedLevel)
+                applyDesiredState(gamerTag.tag, runtime, settings, isVisible)
+
+                if isVisible and runtime.name ~= '' then
+                    nextPlayerLabelDrawEntries[#nextPlayerLabelDrawEntries + 1] = {
+                        ped = runtime.ped,
+                        name = runtime.name,
+                        nameColor = runtime.nameColor,
+                        status = runtime.status,
+                        statusColor = runtime.statusColor,
+                        distanceSquared = runtime.distanceSquared,
+                        runtime = runtime
+                    }
+                else
+                    runtime.drawX = nil
+                    runtime.drawY = nil
                 end
 
-                if settings.healthColor then
-                    SetMpGamerTagHealthBarColour(tag, settings.healthColor)
-                end
-            else
-                SetMpGamerTagVisibility(tag, gtComponent.GAMER_NAME, false)
-                SetMpGamerTagVisibility(tag, gtComponent.healthArmour, false)
-                SetMpGamerTagVisibility(tag, gtComponent.AUDIO_ICON, false)
+                runtime.lastVisible = isVisible
             end
         end
     end
+
+    playerLabelDrawEntries = nextPlayerLabelDrawEntries
+end
+
+updatePlayerNames = updatePlayerNamesImpl
+
+scheduleNextUpdate = function(delay)
+    updateScheduleId = updateScheduleId + 1
+    local scheduledId = updateScheduleId
+
+    SetTimeout(delay, function()
+        if scheduledId == updateScheduleId then
+            updatePlayerNames()
+        end
+    end)
+end
+
+local function wakePlayerNamesUpdate()
+    nextActivePlayersRefresh = 0
+    nextDistanceUpdate = 0
+    nextVoiceUpdate = 0
+    scheduleNextUpdate(0)
 end
 
 local function getSettings(id)
-    local i = GetPlayerFromServerId(tonumber(id))
+    local serverId = tonumber(id)
+    if not serverId then
+        return nil
+    end
+
+    local i = GetPlayerFromServerId(serverId)
+    if not i or i < 0 then
+        return nil
+    end
+
+    local boundServerId = getBoundServerId(i)
+    if boundServerId and boundServerId ~= serverId then
+        removePlayerState(i)
+    end
+
+    playerIndexByServerId[serverId] = i
 
     if not mpGamerTagSettings[i] then
-        mpGamerTagSettings[i] = makeSettings()
+        mpGamerTagSettings[i] = makeSettings(serverId)
     end
 
     return mpGamerTagSettings[i]
@@ -268,33 +839,45 @@ RegisterNetEvent('playernames:configure')
 
 AddEventHandler('playernames:configure', function(id, key, ...)
     local args = table.pack(...)
+    local settings = getSettings(id)
 
-    if key == 'tglc' then
-        getSettings(id).toggles[args[1]] = args[2]
-    elseif key == 'seta' then
-        getSettings(id).alphas[args[1]] = args[2]
-    elseif key == 'setc' then
-        getSettings(id).colors[args[1]] = args[2]
-    elseif key == 'setw' then
-        getSettings(id).wantedLevel = args[1]
-    elseif key == 'sehc' then
-        getSettings(id).healthColor = args[1]
-    elseif key == 'rnme' then
-        getSettings(id).rename = true
-    elseif key == 'name' then
-        getSettings(id).serverName = args[1]
-        getSettings(id).rename = true
-    elseif key == 'tpl' then
-        for _, v in pairs(mpGamerTagSettings) do
-            v.rename = true
+    if key == 'tpl' then
+        for _, value in pairs(mpGamerTagSettings) do
+            value.rename = true
         end
 
         templateStr = args[1]
+        wakePlayerNamesUpdate()
+        return
     end
+
+    if not settings then
+        return
+    end
+
+    if key == 'tglc' then
+        settings.toggles[args[1]] = args[2]
+    elseif key == 'seta' then
+        settings.alphas[args[1]] = args[2]
+    elseif key == 'setc' then
+        settings.colors[args[1]] = args[2]
+    elseif key == 'setw' then
+        settings.wantedLevel = args[1]
+    elseif key == 'sehc' then
+        settings.healthColor = args[1]
+    elseif key == 'rnme' then
+        settings.rename = true
+    elseif key == 'name' then
+        settings.serverName = args[1]
+        settings.rename = true
+    end
+
+    wakePlayerNamesUpdate()
 end)
 
 AddEventHandler('playernames:extendContext', function(i, cb)
-    cb('serverName', getSettings(GetPlayerServerId(i)).serverName)
+    local serverNameSettings = getSettings(GetPlayerServerId(i))
+    cb('serverName', serverNameSettings and serverNameSettings.serverName)
 
     if not IsDuplicityVersion() then
         local settings = playerNameSettings[GetPlayerServerId(i)]
@@ -314,8 +897,13 @@ AddEventHandler('playernames:extendContext', function(i, cb)
         cb('characterName', characterName)
 
         local status = settings and settings.status or ''
+        local statusColor = settings and settings.statusColor or 'white'
+        local nameColor = settings and settings.nameColor or 'white'
+
         cb('status', status)
-        cb('statusLine', status ~= '' and (status .. '\n') or '')
+        cb('statusColor', statusColor)
+        cb('nameColor', nameColor)
+        cb('statusLine', '')
     end
 end)
 
@@ -325,9 +913,13 @@ AddEventHandler('onResourceStop', function(name)
         SendNUIMessage({ action = 'close' })
         SetNuiFocus(false, false)
 
-        for _, v in pairs(mpGamerTags) do
-            RemoveMpGamerTag(v.tag)
+        for i in pairs(mpGamerTags) do
+            removePlayerTag(i)
         end
+
+        mpGamerTagSettings = {}
+        playerNameRuntime = {}
+        playerIndexByServerId = {}
     end
 end)
 
@@ -343,5 +935,5 @@ SetTimeout(0, function()
     TriggerServerEvent('playernames:init')
 end)
 
--- run this function every frame
-SetTimeout(0, updatePlayerNames)
+scheduleNextUpdate(0)
+SetTimeout(0, renderPlayerLabels)

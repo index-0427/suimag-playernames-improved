@@ -55,6 +55,9 @@ button {
 
 .panel {
     position: relative;
+    display: flex;
+    max-height: calc(100vh - 48px);
+    flex-direction: column;
     width: min(100%, 510px);
     border: 1px solid rgba(157, 178, 208, 0.2);
     border-radius: 14px;
@@ -115,6 +118,7 @@ h1 {
 
 form {
     padding: 24px 28px 26px;
+    overflow-y: auto;
 }
 
 .section + .section {
@@ -169,6 +173,45 @@ select {
     color: #7e8b9e;
     font-size: 11px;
     line-height: 1.5;
+}
+
+.color-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 10px;
+}
+
+.color-label {
+    color: #aeb9c9;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.color-control {
+    position: relative;
+    width: 154px;
+    flex: 0 0 auto;
+}
+
+.color-control select {
+    height: 38px;
+    padding-left: 38px;
+}
+
+.color-swatch {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 13px;
+    width: 14px;
+    height: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
+    pointer-events: none;
+    transform: translateY(-50%);
 }
 
 .toggle-section {

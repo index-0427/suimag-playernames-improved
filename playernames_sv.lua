@@ -4,6 +4,31 @@ local curTags = {}
 local activePlayers = {}
 local playerSettings = {}
 
+local allowedTextColors = {
+    white = true,
+    red = true,
+    green = true,
+    blue = true,
+    yellow = true,
+    orange = true,
+    purple = true,
+    pink = true,
+    gray = true
+}
+
+local function normalizeTextColor(value)
+    return allowedTextColors[value] and value or 'white'
+end
+
+local function truncateUtf8(value, maxCharacters)
+    local ok, nextByte = pcall(utf8.offset, value, maxCharacters + 1)
+    if ok and nextByte then
+        return value:sub(1, nextByte - 1)
+    end
+
+    return ok and value or value:sub(1, maxCharacters)
+end
+
 local function getCharacterName(playerId)
     if GetResourceState('qbx_core') ~= 'started' then
         return ''
@@ -19,7 +44,8 @@ local function getCharacterName(playerId)
     local firstName = type(charInfo.firstname) == 'string' and charInfo.firstname or ''
     local lastName = type(charInfo.lastname) == 'string' and charInfo.lastname or ''
 
-    return (firstName .. ' ' .. lastName):gsub('^%s*(.-)%s*$', '%1'):sub(1, 32)
+    local characterName = (firstName .. ' ' .. lastName):gsub('^%s*(.-)%s*$', '%1')
+    return truncateUtf8(characterName, 32)
 end
 
 local function getPersistenceKey(playerId)
@@ -48,7 +74,7 @@ local function trimDisplayName(value)
     value = value:gsub('[\r\n\t]', ' ')
     value = value:match('^%s*(.-)%s*$') or ''
 
-    return value:sub(1, 32)
+    return truncateUtf8(value, 32)
 end
 
 local function trimStatus(value)
@@ -59,7 +85,7 @@ local function trimStatus(value)
     value = value:gsub('[\r\n\t]', ' ')
     value = value:match('^%s*(.-)%s*$') or ''
 
-    return value:sub(1, 32)
+    return truncateUtf8(value, 32)
 end
 
 local function normalizeSettings(settings)
@@ -72,7 +98,9 @@ local function normalizeSettings(settings)
 
     return {
         status = trimStatus(settings.status),
+        statusColor = normalizeTextColor(settings.statusColor),
         displayName = trimDisplayName(settings.displayName),
+        nameColor = normalizeTextColor(settings.nameColor),
         achievement = achievement,
         showSelf = settings.showSelf == true,
         showOthers = settings.showOthers == true,
@@ -111,7 +139,9 @@ end
 local function publicSettings(settings)
     return {
         status = settings.status,
+        statusColor = settings.statusColor,
         displayName = settings.displayName,
+        nameColor = settings.nameColor,
         achievement = settings.achievement,
         characterName = settings.characterName
     }
@@ -154,7 +184,7 @@ end
 local function detectUpdates()
     SetTimeout(500, detectUpdates)
 
-    local template = GetConvar('playerNames_template', '{{statusLine}}{{name}}')
+    local template = GetConvar('playerNames_template', '{{name}}')
     
     if curTemplate ~= template then
         setNameTemplate(-1, template)

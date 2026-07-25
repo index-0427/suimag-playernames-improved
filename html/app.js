@@ -5,18 +5,36 @@
     var form = document.getElementById('settings-form');
     var status = document.getElementById('status');
     var statusCounter = document.getElementById('status-counter');
+    var statusColor = document.getElementById('status-color');
+    var statusColorSwatch = document.getElementById('status-color-swatch');
     var displayName = document.getElementById('display-name');
     var nameCounter = document.getElementById('name-counter');
+    var nameColor = document.getElementById('name-color');
+    var nameColorSwatch = document.getElementById('name-color-swatch');
     var achievement = document.getElementById('achievement');
     var showSelf = document.getElementById('show-self');
     var showOthers = document.getElementById('show-others');
 
     var defaults = {
         status: '',
+        statusColor: 'white',
         displayName: '',
+        nameColor: 'white',
         achievement: 'coming_soon',
         showSelf: false,
         showOthers: false
+    };
+
+    var colorValues = {
+        white: '#f0f0f0',
+        red: '#e03232',
+        green: '#72cc72',
+        blue: '#5db6e5',
+        yellow: '#f0c850',
+        orange: '#ff8555',
+        purple: '#8466e2',
+        pink: '#cb3694',
+        gray: '#8c8c8c'
     };
 
     function resourceName() {
@@ -40,14 +58,26 @@
         nameCounter.textContent = displayName.value.length + ' / 32';
     }
 
+    function normalizeColor(value) {
+        return Object.prototype.hasOwnProperty.call(colorValues, value) ? value : 'white';
+    }
+
+    function updateColorSwatches() {
+        statusColorSwatch.style.backgroundColor = colorValues[normalizeColor(statusColor.value)];
+        nameColorSwatch.style.backgroundColor = colorValues[normalizeColor(nameColor.value)];
+    }
+
     function applySettings(settings) {
         settings = settings || {};
         status.value = typeof settings.status === 'string' ? settings.status.slice(0, 32) : defaults.status;
+        statusColor.value = normalizeColor(settings.statusColor);
         displayName.value = typeof settings.displayName === 'string' ? settings.displayName.slice(0, 32) : defaults.displayName;
+        nameColor.value = normalizeColor(settings.nameColor);
         achievement.value = 'coming_soon';
         showSelf.checked = settings.showSelf === true;
         showOthers.checked = settings.showOthers === true;
         updateCounter();
+        updateColorSwatches();
     }
 
     function open(settings) {
@@ -73,12 +103,16 @@
 
     status.addEventListener('input', updateCounter);
     displayName.addEventListener('input', updateCounter);
+    statusColor.addEventListener('change', updateColorSwatches);
+    nameColor.addEventListener('change', updateColorSwatches);
 
     form.addEventListener('submit', function (event) {
         event.preventDefault();
         post('saveSettings', {
             status: status.value,
+            statusColor: normalizeColor(statusColor.value),
             displayName: displayName.value,
+            nameColor: normalizeColor(nameColor.value),
             achievement: achievement.value,
             showSelf: showSelf.checked,
             showOthers: showOthers.checked
