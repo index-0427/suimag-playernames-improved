@@ -16,7 +16,7 @@ local STATUS_HEIGHT_OFFSET = 1.15
 local STATUS_TEXT_SCALE_MAX = 0.38
 local STATUS_TEXT_SCALE_MIN = 0.24
 local STATUS_TEXT_SCALE_RATIO = 0.82
-local LABEL_LINE_SPACING = 0.018
+local LABEL_LINE_SPACING = 0.026
 local LABEL_SCREEN_SMOOTHING = 0.35
 local LABEL_SCREEN_SNAP_DISTANCE_SQUARED = 0.04
 
@@ -640,17 +640,18 @@ local function drawPlayerLabel(entry)
     local lineSpacing = LABEL_LINE_SPACING * (scale / STATUS_TEXT_SCALE_MAX)
 
     if entry.status ~= '' then
+        -- ponytail: 名前を基準位置に固定し、ステータスは上へ逃がす（ステータス有無で名前がずれない）
         drawPlayerLabelLine(
             entry.status,
             runtime.drawX,
-            runtime.drawY,
+            runtime.drawY - lineSpacing,
             scale * STATUS_TEXT_SCALE_RATIO,
             entry.statusColor
         )
         drawPlayerLabelLine(
             entry.name,
             runtime.drawX,
-            runtime.drawY + lineSpacing,
+            runtime.drawY,
             scale,
             entry.nameColor
         )
