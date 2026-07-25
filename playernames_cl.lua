@@ -505,7 +505,8 @@ local function applyDesiredState(tag, runtime, settings, isVisible)
     desiredVisibility[gtComponent.GAMER_NAME] = false
     desiredVisibility[gtComponent.healthArmour] = false
     desiredVisibility[gtComponent.BIG_TEXT] = false
-    desiredVisibility[gtComponent.AUDIO_ICON] = isVisible and runtime.talking or false
+    -- ponytail: スピーカーアイコンは常に非表示（戻すなら isVisible and runtime.talking or false）
+    desiredVisibility[gtComponent.AUDIO_ICON] = false
 
     local desiredAlphas = {}
     local desiredColors = {}
