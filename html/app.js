@@ -14,6 +14,8 @@
     var achievement = document.getElementById('achievement');
     var showSelf = document.getElementById('show-self');
     var showOthers = document.getElementById('show-others');
+    var maxVisibleNames = document.getElementById('max-visible-names');
+    var maxVisibleNamesValue = document.getElementById('max-visible-names-value');
 
     var defaults = {
         status: '',
@@ -22,7 +24,8 @@
         nameColor: 'white',
         achievement: 'coming_soon',
         showSelf: false,
-        showOthers: false
+        showOthers: false,
+        maxVisibleNames: 5
     };
 
     var legacyColorValues = {
@@ -68,9 +71,24 @@
         return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : '#f0f0f0';
     }
 
+    function normalizeMaxVisibleNames(value) {
+        var limit = Number(value);
+        if (!Number.isFinite(limit)) {
+            return 5;
+        }
+
+        limit = Math.floor(limit);
+        return Math.max(1, Math.min(21, limit));
+    }
+
+    function formatMaxVisibleNames(value) {
+        return value === 21 ? '無制限' : value + '人';
+    }
+
     function updateColorValues() {
         statusColorValue.textContent = normalizeColor(statusColor.value).toUpperCase();
         nameColorValue.textContent = normalizeColor(nameColor.value).toUpperCase();
+        maxVisibleNamesValue.textContent = formatMaxVisibleNames(normalizeMaxVisibleNames(maxVisibleNames.value));
     }
 
     function applySettings(settings) {
@@ -82,6 +100,7 @@
         achievement.value = 'coming_soon';
         showSelf.checked = settings.showSelf === true;
         showOthers.checked = settings.showOthers === true;
+        maxVisibleNames.value = String(normalizeMaxVisibleNames(settings.maxVisibleNames));
         updateCounter();
         updateColorValues();
     }
@@ -111,6 +130,7 @@
     displayName.addEventListener('input', updateCounter);
     statusColor.addEventListener('input', updateColorValues);
     nameColor.addEventListener('input', updateColorValues);
+    maxVisibleNames.addEventListener('input', updateColorValues);
 
     form.addEventListener('submit', function (event) {
         event.preventDefault();
@@ -121,7 +141,8 @@
             nameColor: normalizeColor(nameColor.value),
             achievement: achievement.value,
             showSelf: showSelf.checked,
-            showOthers: showOthers.checked
+            showOthers: showOthers.checked,
+            maxVisibleNames: normalizeMaxVisibleNames(maxVisibleNames.value)
         });
         close(false);
     });

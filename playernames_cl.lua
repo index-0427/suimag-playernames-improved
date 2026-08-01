@@ -23,6 +23,7 @@ local LABEL_SCREEN_SNAP_DISTANCE_SQUARED = 0.04
 local activePlayers = {}
 local activePlayerSet = {}
 local playerLabelDrawEntries = {}
+local nameDisplayCandidateSet = {}
 local nextActivePlayersRefresh = 0
 local nextDistanceUpdate = 0
 local nextVoiceUpdate = 0
@@ -35,7 +36,8 @@ local localSettings = {
     nameColor = 'white',
     achievement = 'coming_soon',
     showSelf = false,
-    showOthers = false
+    showOthers = false,
+    maxVisibleNames = 5
 }
 
 local textColors = {
@@ -76,6 +78,16 @@ local function getTextColor(value)
         green = tonumber(hex:sub(3, 4), 16),
         blue = tonumber(hex:sub(5, 6), 16)
     }
+end
+
+local function normalizeVisibleNameLimit(value)
+    local limit = tonumber(value)
+    if not limit then
+        return 5
+    end
+
+    limit = math.floor(limit)
+    return math.max(1, math.min(21, limit))
 end
 
 local settingsMenuOpen = false
@@ -196,6 +208,53 @@ local function shouldDisplayPlayerName(i)
     return settings and settings.showSelf == true
 end
 
+local function buildNameDisplayCandidateSet(localPlayer, localPed)
+    if not localPed or localPed == 0 or not DoesEntityExist(localPed) then
+        return {}
+    end
+
+    local localCoords = GetEntityCoords(localPed)
+    local candidates = {}
+
+    for _, i in ipairs(activePlayers) do
+        if shouldDisplayPlayerName(i) then
+            local ped = i == localPlayer and localPed or GetPlayerPed(i)
+
+            if ped and ped ~= 0 and DoesEntityExist(ped) then
+                local coords = GetEntityCoords(ped)
+                local dx = coords.x - localCoords.x
+                local dy = coords.y - localCoords.y
+                local dz = coords.z - localCoords.z
+
+                candidates[#candidates + 1] = {
+                    playerIndex = i,
+                    ped = ped,
+                    distanceSquared = dx * dx + dy * dy + dz * dz
+                }
+            end
+        end
+    end
+
+    table.sort(candidates, function(left, right)
+        if left.distanceSquared == right.distanceSquared then
+            return left.playerIndex < right.playerIndex
+        end
+
+        return left.distanceSquared < right.distanceSquared
+    end)
+
+    local limit = normalizeVisibleNameLimit(localSettings.maxVisibleNames)
+    local candidateCount = limit == 21 and #candidates or math.min(limit, #candidates)
+    local candidateSet = {}
+
+    for index = 1, candidateCount do
+        local candidate = candidates[index]
+        candidateSet[candidate.playerIndex] = candidate
+    end
+
+    return candidateSet
+end
+
 local function removeHiddenPlayerTags()
     for i in pairs(mpGamerTags) do
         if not shouldDisplayPlayerName(i) then
@@ -262,7 +321,8 @@ local function normalizeLocalSettings(settings)
         nameColor = nameColor,
         achievement = 'coming_soon',
         showSelf = settings.showSelf == true,
-        showOthers = settings.showOthers == true
+        showOthers = settings.showOthers == true,
+        maxVisibleNames = normalizeVisibleNameLimit(settings.maxVisibleNames)
     }
 end
 
@@ -293,7 +353,8 @@ RegisterNUICallback('saveSettings', function(data, cb)
         nameColor = localSettings.nameColor,
         achievement = localSettings.achievement,
         showSelf = localSettings.showSelf,
-        showOthers = localSettings.showOthers
+        showOthers = localSettings.showOthers,
+        maxVisibleNames = localSettings.maxVisibleNames
     })
 
     -- Hide tags immediately when the display mode changes instead of waiting
@@ -337,6 +398,7 @@ AddEventHandler('playernames:settingsUpdated', function(serverId, settings)
         if serverId == GetPlayerServerId(PlayerId()) then
             local previousShowSelf = localSettings.showSelf
             local previousShowOthers = localSettings.showOthers
+            local previousMaxVisibleNames = localSettings.maxVisibleNames
             local normalized = normalizeLocalSettings(settings)
 
             -- The public event includes showSelf because it controls whether
@@ -344,6 +406,10 @@ AddEventHandler('playernames:settingsUpdated', function(serverId, settings)
             -- showOthers master switch remains private to this client.
             if settings.showOthers == nil then
                 normalized.showOthers = previousShowOthers
+            end
+
+            if settings.maxVisibleNames == nil then
+                normalized.maxVisibleNames = previousMaxVisibleNames
             end
 
             localSettings = normalized
@@ -722,16 +788,16 @@ local function updatePlayerNamesImpl()
     -- player/ped/LOS work until a display option is enabled.
     if not templateStr or not showAny then
         playerLabelDrawEntries = {}
+        nameDisplayCandidateSet = {}
         return
     end
 
     local localPlayer = PlayerId()
     local localPed = PlayerPedId()
-    local localCoords
-    local updateDistance = now >= nextDistanceUpdate
     local updateVoice = now >= nextVoiceUpdate
 
-    if updateDistance then
+    if now >= nextDistanceUpdate then
+        nameDisplayCandidateSet = buildNameDisplayCandidateSet(localPlayer, localPed)
         nextDistanceUpdate = now + DISTANCE_INTERVAL
     end
 
@@ -743,7 +809,8 @@ local function updatePlayerNamesImpl()
 
     for _, i in ipairs(activePlayers) do
         local isSelf = i == localPlayer
-        local shouldShow = shouldDisplayPlayerName(i)
+        local candidate = nameDisplayCandidateSet[i]
+        local shouldShow = candidate ~= nil
 
         if not shouldShow then
             removePlayerTag(i)
@@ -755,26 +822,16 @@ local function updatePlayerNamesImpl()
                 shouldCheckPed = true
             end
 
+            local pedForTag = isSelf and localPed or (shouldCheckPed and candidate.ped or nil)
             local gamerTag
-            gamerTag, runtime = ensurePlayerTag(i, isSelf and localPed or nil, now, shouldCheckPed)
+            gamerTag, runtime = ensurePlayerTag(i, pedForTag, now, shouldCheckPed)
 
             if gamerTag then
                 local settings = mpGamerTagSettings[i]
                 applyPendingRename(i, gamerTag.tag, runtime, settings)
 
-                if updateDistance or not runtime.hasDistance then
-                    if not localCoords then
-                        localCoords = GetEntityCoords(localPed)
-                    end
-
-                    local pedCoords = GetEntityCoords(runtime.ped)
-                    local dx = pedCoords.x - localCoords.x
-                    local dy = pedCoords.y - localCoords.y
-                    local dz = pedCoords.z - localCoords.z
-
-                    runtime.distanceSquared = dx * dx + dy * dy + dz * dz
-                    runtime.hasDistance = true
-                end
+                runtime.distanceSquared = candidate.distanceSquared
+                runtime.hasDistance = true
 
                 local isNearby = runtime.hasDistance and runtime.distanceSquared < DISPLAY_DISTANCE_SQUARED
 

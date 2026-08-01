@@ -30,6 +30,16 @@ local function normalizeTextColor(value)
     return hex and ('#%s'):format(hex) or '#f0f0f0'
 end
 
+local function normalizeVisibleNameLimit(value)
+    local limit = tonumber(value)
+    if not limit then
+        return 5
+    end
+
+    limit = math.floor(limit)
+    return math.max(1, math.min(21, limit))
+end
+
 local function truncateUtf8(value, maxCharacters)
     local ok, nextByte = pcall(utf8.offset, value, maxCharacters + 1)
     if ok and nextByte then
@@ -114,6 +124,7 @@ local function normalizeSettings(settings)
         achievement = achievement,
         showSelf = settings.showSelf == true,
         showOthers = settings.showOthers == true,
+        maxVisibleNames = normalizeVisibleNameLimit(settings.maxVisibleNames),
         characterName = type(settings.characterName) == 'string' and settings.characterName or ''
     }
 end
