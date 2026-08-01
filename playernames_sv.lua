@@ -37,7 +37,7 @@ local function normalizeVisibleNameLimit(value)
     end
 
     limit = math.floor(limit)
-    return math.max(1, math.min(21, limit))
+    return math.max(1, math.min(20, limit))
 end
 
 local function truncateUtf8(value, maxCharacters)

@@ -87,7 +87,7 @@ local function normalizeVisibleNameLimit(value)
     end
 
     limit = math.floor(limit)
-    return math.max(1, math.min(21, limit))
+    return math.max(1, math.min(20, limit))
 end
 
 local settingsMenuOpen = false
@@ -244,7 +244,7 @@ local function buildNameDisplayCandidateSet(localPlayer, localPed)
     end)
 
     local limit = normalizeVisibleNameLimit(localSettings.maxVisibleNames)
-    local candidateCount = limit == 21 and #candidates or math.min(limit, #candidates)
+    local candidateCount = math.min(limit, #candidates)
     local candidateSet = {}
 
     for index = 1, candidateCount do

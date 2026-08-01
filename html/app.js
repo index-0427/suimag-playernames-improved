@@ -78,11 +78,11 @@
         }
 
         limit = Math.floor(limit);
-        return Math.max(1, Math.min(21, limit));
+        return Math.max(1, Math.min(20, limit));
     }
 
     function formatMaxVisibleNames(value) {
-        return value === 21 ? '無制限' : value + '人';
+        return value + '人';
     }
 
     function updateColorValues() {
