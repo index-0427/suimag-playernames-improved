@@ -175,6 +175,10 @@ select {
     line-height: 1.5;
 }
 
+.field-help-input {
+    margin-bottom: 4px;
+}
+
 .color-row {
     display: flex;
     align-items: center;
