@@ -64,8 +64,7 @@ button {
     width: min(100%, 510px);
     border: 1px solid rgba(157, 178, 208, 0.2);
     border-radius: 14px;
-    background: rgba(21, 27, 37, 0.62);
-    backdrop-filter: blur(6px);
+    background: #151b25;
     box-shadow: none;
     clip-path: inset(0 round 14px);
     overflow: hidden;
@@ -79,8 +78,7 @@ button {
     width: min(100%, 280px);
     border: 1px solid rgba(157, 178, 208, 0.2);
     border-radius: 14px;
-    background: rgba(21, 27, 37, 0.62);
-    backdrop-filter: blur(6px);
+    background: #151b25;
     box-shadow: none;
     clip-path: inset(0 round 14px);
     overflow: hidden;
