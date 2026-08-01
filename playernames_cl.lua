@@ -227,8 +227,7 @@ local function normalizeLocalSettings(settings)
     }
 end
 
-RegisterCommand('playernames', openSettingsMenu, false)
-RegisterCommand('namesettings', openSettingsMenu, false)
+RegisterCommand('name', openSettingsMenu, false)
 
 RegisterNUICallback('close', function(_, cb)
     closeSettingsMenu()
