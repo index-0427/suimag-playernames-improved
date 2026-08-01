@@ -16,6 +16,8 @@
     var showOthers = document.getElementById('show-others');
     var maxVisibleNames = document.getElementById('max-visible-names');
     var maxVisibleNamesValue = document.getElementById('max-visible-names-value');
+    var previewStatus = document.getElementById('preview-status');
+    var previewName = document.getElementById('preview-name');
 
     var defaults = {
         status: '',
@@ -59,6 +61,7 @@
     function updateCounter() {
         statusCounter.textContent = status.value.length + ' / 32';
         nameCounter.textContent = displayName.value.length + ' / 32';
+        updatePreview();
     }
 
     function normalizeColor(value) {
@@ -85,10 +88,23 @@
         return value + '人';
     }
 
+    function updatePreview() {
+        var statusValue = status.value.trim();
+        var nameValue = displayName.value.trim();
+
+        previewStatus.textContent = statusValue;
+        previewStatus.style.color = normalizeColor(statusColor.value);
+        previewStatus.hidden = statusValue === '';
+
+        previewName.textContent = nameValue || 'キャラクターネーム';
+        previewName.style.color = normalizeColor(nameColor.value);
+    }
+
     function updateColorValues() {
         statusColorValue.textContent = normalizeColor(statusColor.value).toUpperCase();
         nameColorValue.textContent = normalizeColor(nameColor.value).toUpperCase();
         maxVisibleNamesValue.textContent = formatMaxVisibleNames(normalizeMaxVisibleNames(maxVisibleNames.value));
+        updatePreview();
     }
 
     function applySettings(settings) {

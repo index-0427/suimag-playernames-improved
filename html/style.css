@@ -43,7 +43,10 @@ button {
 }
 
 .app.is-open {
-    display: grid;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
 }
 
 .backdrop {
@@ -65,6 +68,41 @@ button {
     backdrop-filter: blur(6px);
     box-shadow: none;
     overflow: hidden;
+}
+
+.preview-panel {
+    position: relative;
+    display: flex;
+    max-height: calc(100vh - 48px);
+    flex-direction: column;
+    width: min(100%, 280px);
+    border: 1px solid rgba(157, 178, 208, 0.2);
+    border-radius: 14px;
+    background: rgba(21, 27, 37, 0.62);
+    backdrop-filter: blur(6px);
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.preview-panel-header {
+    padding: 22px 22px 18px;
+    border-bottom: 1px solid rgba(157, 178, 208, 0.13);
+}
+
+.preview-panel-header .eyebrow {
+    margin-bottom: 6px;
+}
+
+.preview-panel-title {
+    margin: 0;
+    color: #f4f7fb;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.preview-panel-body {
+    padding: 22px;
+    overflow-y: auto;
 }
 
 .panel-header {
@@ -177,6 +215,43 @@ select {
 
 .field-help-input {
     margin-bottom: 4px;
+}
+
+.name-preview {
+    display: flex;
+    min-height: 96px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 18px 16px;
+    border: 1px solid rgba(157, 178, 208, 0.2);
+    border-radius: 10px;
+    background: rgba(9, 13, 21, 0.42);
+    text-align: center;
+}
+
+.preview-panel .name-preview {
+    min-height: 180px;
+}
+
+.name-preview-status,
+.name-preview-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-shadow: 1px 1px 0 #000000, -1px -1px 0 #000000, 1px -1px 0 #000000, -1px 1px 0 #000000;
+}
+
+.name-preview-status {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.name-preview-name {
+    font-size: 18px;
+    font-weight: 700;
 }
 
 .color-row {
@@ -381,5 +456,27 @@ input[type="range"]:focus-visible {
     form {
         padding-left: 20px;
         padding-right: 20px;
+    }
+}
+
+@media (max-width: 860px) {
+    .app {
+        overflow-y: auto;
+    }
+
+    .app.is-open {
+        align-items: stretch;
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+
+    .panel,
+    .preview-panel {
+        max-height: none;
+        width: 100%;
+    }
+
+    .preview-panel {
+        flex: 0 0 auto;
     }
 }
