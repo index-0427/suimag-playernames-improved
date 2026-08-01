@@ -55,10 +55,10 @@
 
                 <section class="section">
                     <label class="field-label" for="achievement">実績</label>
+                    <p class="field-help">実績機能は今後のアップデートで追加予定です。</p>
                     <select id="achievement" name="achievement">
                         <option value="coming_soon">実装中</option>
                     </select>
-                    <p class="field-help">実績機能は今後のアップデートで追加予定です。</p>
                 </section>
 
                 <section class="section toggle-section" aria-label="名前表示設定">
@@ -92,8 +92,8 @@
                         <span>自分視点で表示するネームタグ上限</span>
                         <output id="max-visible-names-value" class="counter">5人</output>
                     </label>
-                    <input id="max-visible-names" name="maxVisibleNames" type="range" min="1" max="21" step="1" value="5">
                     <p class="field-help">近いプレイヤーから順に表示します。1〜20人まで設定でき、最大値は無制限です。表示人数が増えるほど、距離・視線判定などの処理で負荷が高くなります。</p>
+                    <input id="max-visible-names" name="maxVisibleNames" type="range" min="1" max="21" step="1" value="5">
                 </section>
 
                 <footer class="actions">
