@@ -22,22 +22,6 @@
 
             <form id="settings-form">
                 <section class="section">
-                    <label class="field-label" for="display-name">
-                        <span>表示名</span>
-                        <span id="name-counter" class="counter">0 / 32</span>
-                    </label>
-                    <p class="field-help field-help-input">他のプレイヤーに表示される名前です。</p>
-                    <input id="display-name" name="displayName" type="text" maxlength="32" autocomplete="off" placeholder="空欄の場合はキャラクターネームを使用">
-                    <div class="color-row">
-                        <label class="color-label" for="name-color">表示名の色</label>
-                        <div class="color-control">
-                            <input id="name-color" name="nameColor" type="color" value="#f0f0f0" aria-label="表示名の色">
-                            <output id="name-color-value" class="color-value">#F0F0F0</output>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="section">
                     <label class="field-label" for="status">
                         <span>ステータス</span>
                         <span id="status-counter" class="counter">0 / 32</span>
@@ -49,6 +33,22 @@
                         <div class="color-control">
                             <input id="status-color" name="statusColor" type="color" value="#f0f0f0" aria-label="ステータスの色">
                             <output id="status-color-value" class="color-value">#F0F0F0</output>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <label class="field-label" for="display-name">
+                        <span>表示名</span>
+                        <span id="name-counter" class="counter">0 / 32</span>
+                    </label>
+                    <p class="field-help field-help-input">他のプレイヤーに表示される名前です。</p>
+                    <input id="display-name" name="displayName" type="text" maxlength="32" autocomplete="off" placeholder="空欄の場合はキャラクターネームを使用">
+                    <div class="color-row">
+                        <label class="color-label" for="name-color">表示名の色</label>
+                        <div class="color-control">
+                            <input id="name-color" name="nameColor" type="color" value="#f0f0f0" aria-label="表示名の色">
+                            <output id="name-color-value" class="color-value">#F0F0F0</output>
                         </div>
                     </div>
                 </section>
