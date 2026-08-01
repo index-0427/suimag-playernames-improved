@@ -190,28 +190,28 @@ select {
 }
 
 .color-control {
-    position: relative;
-    width: 154px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     flex: 0 0 auto;
 }
 
-.color-control select {
+input[type="color"] {
+    width: 48px;
     height: 38px;
-    padding-left: 38px;
+    border: 1px solid #344154;
+    border-radius: 8px;
+    padding: 3px;
+    background: #0f141d;
+    cursor: pointer;
 }
 
-.color-swatch {
-    position: absolute;
-    z-index: 1;
-    top: 50%;
-    left: 13px;
-    width: 14px;
-    height: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 50%;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
-    pointer-events: none;
-    transform: translateY(-50%);
+.color-value {
+    min-width: 72px;
+    color: #aeb9c9;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
 }
 
 .toggle-section {

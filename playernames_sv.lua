@@ -4,20 +4,30 @@ local curTags = {}
 local activePlayers = {}
 local playerSettings = {}
 
-local allowedTextColors = {
-    white = true,
-    red = true,
-    green = true,
-    blue = true,
-    yellow = true,
-    orange = true,
-    purple = true,
-    pink = true,
-    gray = true
+local legacyTextColors = {
+    white = '#f0f0f0',
+    red = '#e03232',
+    green = '#72cc72',
+    blue = '#5db6e5',
+    yellow = '#f0c850',
+    orange = '#ff8555',
+    purple = '#8466e2',
+    pink = '#cb3694',
+    gray = '#8c8c8c'
 }
 
 local function normalizeTextColor(value)
-    return allowedTextColors[value] and value or 'white'
+    if type(value) ~= 'string' then
+        return '#f0f0f0'
+    end
+
+    local normalized = value:lower()
+    if legacyTextColors[normalized] then
+        return legacyTextColors[normalized]
+    end
+
+    local hex = normalized:match('^#(%x%x%x%x%x%x)$')
+    return hex and ('#%s'):format(hex) or '#f0f0f0'
 end
 
 local function truncateUtf8(value, maxCharacters)

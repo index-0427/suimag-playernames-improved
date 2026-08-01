@@ -50,6 +50,34 @@ local textColors = {
     gray = { hud = 67, red = 140, green = 140, blue = 140 }
 }
 
+local DEFAULT_TEXT_COLOR = '#f0f0f0'
+
+local function normalizeTextColor(value)
+    if type(value) ~= 'string' then
+        return DEFAULT_TEXT_COLOR
+    end
+
+    local normalized = value:lower()
+    local legacyColor = textColors[normalized]
+
+    if legacyColor then
+        return ('#%02x%02x%02x'):format(legacyColor.red, legacyColor.green, legacyColor.blue)
+    end
+
+    local hex = normalized:match('^#(%x%x%x%x%x%x)$')
+    return hex and ('#%s'):format(hex) or DEFAULT_TEXT_COLOR
+end
+
+local function getTextColor(value)
+    local hex = normalizeTextColor(value):sub(2)
+
+    return {
+        red = tonumber(hex:sub(1, 2), 16),
+        green = tonumber(hex:sub(3, 4), 16),
+        blue = tonumber(hex:sub(5, 6), 16)
+    }
+end
+
 local settingsMenuOpen = false
 local updatePlayerNames
 local scheduleNextUpdate
@@ -97,8 +125,8 @@ local function makeRuntime(serverId)
         lastVisible = false,
         name = '',
         status = '',
-        statusColor = textColors.white,
-        nameColor = textColors.white,
+        statusColor = getTextColor(DEFAULT_TEXT_COLOR),
+        nameColor = getTextColor(DEFAULT_TEXT_COLOR),
         drawX = nil,
         drawY = nil,
         nextTagCheck = 0,
@@ -204,8 +232,8 @@ local function normalizeLocalSettings(settings)
     local displayName = type(settings.displayName) == 'string' and settings.displayName or ''
     displayName = displayName:gsub('[\r\n\t]', ' '):match('^%s*(.-)%s*$') or ''
 
-    local statusColor = textColors[settings.statusColor] and settings.statusColor or 'white'
-    local nameColor = textColors[settings.nameColor] and settings.nameColor or 'white'
+    local statusColor = normalizeTextColor(settings.statusColor)
+    local nameColor = normalizeTextColor(settings.nameColor)
 
     local function truncateUtf8(value, maxCharacters)
         local ok, nextByte = pcall(utf8.offset, value, maxCharacters + 1)
@@ -391,8 +419,8 @@ end
 local function getPlayerTextPresentation(i)
     local settings = playerNameSettings[GetPlayerServerId(i)] or {}
     local status = type(settings.status) == 'string' and settings.status or ''
-    local statusColor = textColors[settings.statusColor] or textColors.white
-    local nameColor = textColors[settings.nameColor] or textColors.white
+    local statusColor = getTextColor(settings.statusColor)
+    local nameColor = getTextColor(settings.nameColor)
 
     return status, statusColor, nameColor
 end

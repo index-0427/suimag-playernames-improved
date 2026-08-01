@@ -6,11 +6,11 @@
     var status = document.getElementById('status');
     var statusCounter = document.getElementById('status-counter');
     var statusColor = document.getElementById('status-color');
-    var statusColorSwatch = document.getElementById('status-color-swatch');
+    var statusColorValue = document.getElementById('status-color-value');
     var displayName = document.getElementById('display-name');
     var nameCounter = document.getElementById('name-counter');
     var nameColor = document.getElementById('name-color');
-    var nameColorSwatch = document.getElementById('name-color-swatch');
+    var nameColorValue = document.getElementById('name-color-value');
     var achievement = document.getElementById('achievement');
     var showSelf = document.getElementById('show-self');
     var showOthers = document.getElementById('show-others');
@@ -25,7 +25,7 @@
         showOthers: false
     };
 
-    var colorValues = {
+    var legacyColorValues = {
         white: '#f0f0f0',
         red: '#e03232',
         green: '#72cc72',
@@ -59,12 +59,18 @@
     }
 
     function normalizeColor(value) {
-        return Object.prototype.hasOwnProperty.call(colorValues, value) ? value : 'white';
+        var normalized = typeof value === 'string' ? value.toLowerCase() : '';
+
+        if (Object.prototype.hasOwnProperty.call(legacyColorValues, normalized)) {
+            return legacyColorValues[normalized];
+        }
+
+        return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : '#f0f0f0';
     }
 
-    function updateColorSwatches() {
-        statusColorSwatch.style.backgroundColor = colorValues[normalizeColor(statusColor.value)];
-        nameColorSwatch.style.backgroundColor = colorValues[normalizeColor(nameColor.value)];
+    function updateColorValues() {
+        statusColorValue.textContent = normalizeColor(statusColor.value).toUpperCase();
+        nameColorValue.textContent = normalizeColor(nameColor.value).toUpperCase();
     }
 
     function applySettings(settings) {
@@ -77,7 +83,7 @@
         showSelf.checked = settings.showSelf === true;
         showOthers.checked = settings.showOthers === true;
         updateCounter();
-        updateColorSwatches();
+        updateColorValues();
     }
 
     function open(settings) {
@@ -103,8 +109,8 @@
 
     status.addEventListener('input', updateCounter);
     displayName.addEventListener('input', updateCounter);
-    statusColor.addEventListener('change', updateColorSwatches);
-    nameColor.addEventListener('change', updateColorSwatches);
+    statusColor.addEventListener('input', updateColorValues);
+    nameColor.addEventListener('input', updateColorValues);
 
     form.addEventListener('submit', function (event) {
         event.preventDefault();

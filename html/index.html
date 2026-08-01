@@ -30,18 +30,8 @@
                     <div class="color-row">
                         <label class="color-label" for="name-color">表示名の色</label>
                         <div class="color-control">
-                            <span id="name-color-swatch" class="color-swatch" aria-hidden="true"></span>
-                            <select id="name-color" name="nameColor">
-                                <option value="white">白</option>
-                                <option value="red">赤</option>
-                                <option value="green">緑</option>
-                                <option value="blue">青</option>
-                                <option value="yellow">黄</option>
-                                <option value="orange">オレンジ</option>
-                                <option value="purple">紫</option>
-                                <option value="pink">ピンク</option>
-                                <option value="gray">グレー</option>
-                            </select>
+                            <input id="name-color" name="nameColor" type="color" value="#f0f0f0" aria-label="表示名の色">
+                            <output id="name-color-value" class="color-value">#F0F0F0</output>
                         </div>
                     </div>
                     <p class="field-help">他のプレイヤーに表示される名前です。</p>
@@ -56,18 +46,8 @@
                     <div class="color-row">
                         <label class="color-label" for="status-color">ステータスの色</label>
                         <div class="color-control">
-                            <span id="status-color-swatch" class="color-swatch" aria-hidden="true"></span>
-                            <select id="status-color" name="statusColor">
-                                <option value="white">白</option>
-                                <option value="red">赤</option>
-                                <option value="green">緑</option>
-                                <option value="blue">青</option>
-                                <option value="yellow">黄</option>
-                                <option value="orange">オレンジ</option>
-                                <option value="purple">紫</option>
-                                <option value="pink">ピンク</option>
-                                <option value="gray">グレー</option>
-                            </select>
+                            <input id="status-color" name="statusColor" type="color" value="#f0f0f0" aria-label="ステータスの色">
+                            <output id="status-color-value" class="color-value">#F0F0F0</output>
                         </div>
                     </div>
                     <p class="field-help">名前の上に表示されるテキストです。</p>
