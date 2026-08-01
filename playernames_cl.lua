@@ -186,10 +186,9 @@ local function shouldDisplayPlayerName(i)
         return false
     end
 
-    -- A player's own privacy setting only applies to other viewers. The local
-    -- player can always see their own label while the local master switch is on.
+    -- Keep the local view consistent with the player's public visibility choice.
     if i == PlayerId() then
-        return true
+        return localSettings.showSelf
     end
 
     local serverId = GetPlayerServerId(i)
