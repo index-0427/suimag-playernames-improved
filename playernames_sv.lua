@@ -152,6 +152,7 @@ local function publicSettings(settings)
         statusColor = settings.statusColor,
         displayName = settings.displayName,
         nameColor = settings.nameColor,
+        showSelf = settings.showSelf,
         achievement = settings.achievement,
         characterName = settings.characterName
     }

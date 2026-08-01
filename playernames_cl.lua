@@ -180,14 +180,26 @@ local function removePlayerState(i)
     end
 end
 
+local function shouldDisplayPlayerName(i)
+    -- showOthers is the local master switch for both self and other labels.
+    if not localSettings.showOthers then
+        return false
+    end
+
+    -- A player's own privacy setting only applies to other viewers. The local
+    -- player can always see their own label while the local master switch is on.
+    if i == PlayerId() then
+        return true
+    end
+
+    local serverId = GetPlayerServerId(i)
+    local settings = playerNameSettings[serverId]
+    return settings and settings.showSelf == true
+end
+
 local function removeHiddenPlayerTags()
-    local localPlayer = PlayerId()
-
     for i in pairs(mpGamerTags) do
-        local isSelf = i == localPlayer
-        local shouldShow = isSelf and localSettings.showSelf or (not isSelf and localSettings.showOthers)
-
-        if not shouldShow then
+        if not shouldDisplayPlayerName(i) then
             removePlayerTag(i)
         end
     end
@@ -328,13 +340,9 @@ AddEventHandler('playernames:settingsUpdated', function(serverId, settings)
             local previousShowOthers = localSettings.showOthers
             local normalized = normalizeLocalSettings(settings)
 
-            -- Public settings are also broadcast back to their owner, but do
-            -- not contain the private visibility flags. Preserve the current
-            -- values until the owner-only settings event arrives.
-            if settings.showSelf == nil then
-                normalized.showSelf = previousShowSelf
-            end
-
+            -- The public event includes showSelf because it controls whether
+            -- this player's name may be rendered by other clients. The local
+            -- showOthers master switch remains private to this client.
             if settings.showOthers == nil then
                 normalized.showOthers = previousShowOthers
             end
@@ -700,7 +708,7 @@ end
 
 local function updatePlayerNamesImpl()
     local now = GetGameTimer()
-    local showAny = localSettings.showSelf or localSettings.showOthers
+    local showAny = localSettings.showOthers
     local nextDelay = templateStr and showAny and ACTIVE_UPDATE_INTERVAL or IDLE_UPDATE_INTERVAL
 
     -- Reserve the next pass before any template, event, or Native work. A
@@ -736,7 +744,7 @@ local function updatePlayerNamesImpl()
 
     for _, i in ipairs(activePlayers) do
         local isSelf = i == localPlayer
-        local shouldShow = isSelf and localSettings.showSelf or (not isSelf and localSettings.showOthers)
+        local shouldShow = shouldDisplayPlayerName(i)
 
         if not shouldShow then
             removePlayerTag(i)
