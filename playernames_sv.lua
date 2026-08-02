@@ -3,6 +3,7 @@ local curTags = {}
 
 local activePlayers = {}
 local playerSettings = {}
+local nameVisibilityOverrides = {}
 
 local legacyTextColors = {
     white = '#f0f0f0',
@@ -157,13 +158,18 @@ local function savePersistentSettings(playerId, settings)
     end
 end
 
-local function publicSettings(settings)
+local function publicSettings(playerId, settings)
+    local showSelf = settings.showSelf
+    if nameVisibilityOverrides[playerId] == false then
+        showSelf = false
+    end
+
     return {
         status = settings.status,
         statusColor = settings.statusColor,
         displayName = settings.displayName,
         nameColor = settings.nameColor,
-        showSelf = settings.showSelf,
+        showSelf = showSelf,
         achievement = settings.achievement,
         characterName = settings.characterName
     }
@@ -175,7 +181,7 @@ local function broadcastPlayerSettings(playerId, includeLocalSettings)
         return
     end
 
-    TriggerClientEvent('playernames:settingsUpdated', -1, playerId, publicSettings(settings))
+    TriggerClientEvent('playernames:settingsUpdated', -1, playerId, publicSettings(playerId, settings))
 
     if includeLocalSettings then
         TriggerClientEvent('playernames:settingsUpdated', playerId, playerId, settings)
@@ -232,10 +238,33 @@ local function detectUpdates()
     end
 end
 
-AddEventHandler('playerDropped', function()
+RegisterNetEvent("playernames:setSelfNameVisible")
+AddEventHandler("playernames:setSelfNameVisible", function(visible)
+    local playerId = source
+    local nameVisible = visible == true
+
+    if nameVisible then
+        if nameVisibilityOverrides[playerId] == nil then
+            return
+        end
+
+        nameVisibilityOverrides[playerId] = nil
+    else
+        if nameVisibilityOverrides[playerId] == false then
+            return
+        end
+
+        nameVisibilityOverrides[playerId] = false
+    end
+
+    broadcastPlayerSettings(playerId, true)
+end)
+
+AddEventHandler("playerDropped", function()
     curTags[source] = nil
     activePlayers[source] = nil
     playerSettings[source] = nil
+    nameVisibilityOverrides[source] = nil
     TriggerClientEvent('playernames:settingsUpdated', -1, source, false)
 end)
 
@@ -256,7 +285,7 @@ AddEventHandler('playernames:init', function()
     activePlayers[playerId] = true
 
     for id, settings in pairs(playerSettings) do
-        local data = id == playerId and settings or publicSettings(settings)
+        local data = id == playerId and settings or publicSettings(id, settings)
         TriggerClientEvent('playernames:settingsUpdated', playerId, id, data)
     end
 

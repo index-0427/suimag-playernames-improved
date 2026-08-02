@@ -3,6 +3,7 @@ local mpGamerTagSettings = {}
 local playerNameRuntime = {}
 local playerNameSettings = {}
 local playerIndexByServerId = {}
+local localNameVisible
 
 local ACTIVE_PLAYERS_INTERVAL = 250
 local TAG_CHECK_INTERVAL = 250
@@ -192,6 +193,25 @@ local function removePlayerState(i)
     end
 end
 
+local function isLocalPlayerTransparent(localPed)
+    if not localPed or localPed == 0 or not DoesEntityExist(localPed) then
+        return false
+    end
+
+    return not IsEntityVisible(localPed)
+end
+
+local function updateLocalNameTagVisibility(localPed)
+    local nameVisible = not isLocalPlayerTransparent(localPed)
+
+    if nameVisible == localNameVisible then
+        return
+    end
+
+    localNameVisible = nameVisible
+    TriggerServerEvent("playernames:setSelfNameVisible", nameVisible)
+end
+
 local function shouldDisplayPlayerName(i)
     -- showOthers is the local master switch for both self and other labels.
     if not localSettings.showOthers then
@@ -200,7 +220,7 @@ local function shouldDisplayPlayerName(i)
 
     -- Keep the local view consistent with the player's public visibility choice.
     if i == PlayerId() then
-        return localSettings.showSelf
+        return localSettings.showSelf and localNameVisible ~= false
     end
 
     local serverId = GetPlayerServerId(i)
@@ -784,6 +804,10 @@ local function updatePlayerNamesImpl()
         refreshActivePlayers(now)
     end
 
+    local localPlayer = PlayerId()
+    local localPed = PlayerPedId()
+    updateLocalNameTagVisibility(localPed)
+
     -- Keep this loop alive at a low rate while disabled, but do not perform
     -- player/ped/LOS work until a display option is enabled.
     if not templateStr or not showAny then
@@ -792,8 +816,6 @@ local function updatePlayerNamesImpl()
         return
     end
 
-    local localPlayer = PlayerId()
-    local localPed = PlayerPedId()
     local updateVoice = now >= nextVoiceUpdate
 
     if now >= nextDistanceUpdate then
