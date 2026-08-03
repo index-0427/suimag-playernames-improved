@@ -401,7 +401,22 @@ AddEventHandler('playernames:settingsUpdated', function(serverId, settings)
     if settings == false then
         playerNameSettings[serverId] = nil
 
-        -- The server sends this for a dropped player. Remove the tag and all
+        if serverId == GetPlayerServerId(PlayerId()) then
+            localSettings = {
+                status = '',
+                statusColor = 'white',
+                displayName = '',
+                nameColor = 'white',
+                achievement = 'coming_soon',
+                showSelf = false,
+                showOthers = false,
+                maxVisibleNames = 5
+            }
+            localNameVisible = nil
+        end
+
+        -- The server sends this for a dropped player or unloaded character.
+        -- Remove the tag and all
         -- slot-indexed state immediately, before the next active-player scan.
         if not playerIndex or playerIndex < 0 then
             playerIndex = playerIndexByServerId[serverId]

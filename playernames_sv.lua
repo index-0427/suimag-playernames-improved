@@ -50,13 +50,29 @@ local function truncateUtf8(value, maxCharacters)
     return ok and value or value:sub(1, maxCharacters)
 end
 
-local function getCharacterName(playerId)
+local function getPlayerData(playerId)
     if GetResourceState('qbx_core') ~= 'started' then
-        return ''
+        return nil
     end
 
     local player = exports.qbx_core:GetPlayer(playerId)
-    local charInfo = player and player.PlayerData and player.PlayerData.charinfo
+    return player and player.PlayerData or nil
+end
+
+local function getCharacterId(playerId)
+    local playerData = getPlayerData(playerId)
+    local characterId = playerData and playerData.citizenid
+
+    if type(characterId) ~= 'string' or characterId == '' then
+        return nil
+    end
+
+    return characterId
+end
+
+local function getCharacterName(playerId)
+    local playerData = getPlayerData(playerId)
+    local charInfo = playerData and playerData.charinfo
 
     if not charInfo then
         return ''
@@ -69,7 +85,7 @@ local function getCharacterName(playerId)
     return truncateUtf8(characterName, 32)
 end
 
-local function getPersistenceKey(playerId)
+local function getAccountIdentifier(playerId)
     local identifier = GetPlayerIdentifierByType(playerId, 'license')
 
     if not identifier then
@@ -80,11 +96,37 @@ local function getPersistenceKey(playerId)
         identifier = GetPlayerIdentifierByType(playerId, 'fivem')
     end
 
+    return identifier
+end
+
+local function getLegacyPersistenceKey(playerId)
+    local identifier = getAccountIdentifier(playerId)
+
     if not identifier then
         return nil
     end
 
     return ('playernames:%s'):format(identifier:gsub('[^%w_.%-]', '_'))
+end
+
+local function getPersistenceKey(playerId)
+    local characterId = getCharacterId(playerId)
+
+    if not characterId then
+        return nil
+    end
+
+    return ('playernames:character:%s'):format(characterId:gsub('[^%w_.%-]', '_'))
+end
+
+local function getMigrationKey(playerId)
+    local identifier = getAccountIdentifier(playerId)
+
+    if not identifier then
+        return nil
+    end
+
+    return ('playernames:migration:character-v1:%s'):format(identifier:gsub('[^%w_.%-]', '_'))
 end
 
 local function trimDisplayName(value)
@@ -130,6 +172,24 @@ local function normalizeSettings(settings)
     }
 end
 
+local function readPersistentSettings(key)
+    if not key then
+        return nil
+    end
+
+    local encoded = GetResourceKvpString(key)
+    if not encoded or encoded == '' then
+        return nil
+    end
+
+    local ok, decoded = pcall(json.decode, encoded)
+    if not ok or type(decoded) ~= 'table' then
+        return nil
+    end
+
+    return normalizeSettings(decoded)
+end
+
 local function loadPersistentSettings(playerId)
     local key = getPersistenceKey(playerId)
 
@@ -137,17 +197,25 @@ local function loadPersistentSettings(playerId)
         return normalizeSettings({})
     end
 
-    local encoded = GetResourceKvpString(key)
-    if not encoded or encoded == '' then
-        return normalizeSettings({})
+    local settings = readPersistentSettings(key)
+    if settings then
+        return settings
     end
 
-    local ok, decoded = pcall(json.decode, encoded)
-    if not ok or type(decoded) ~= 'table' then
-        return normalizeSettings({})
+    -- Migrate the old account-level settings only once. This preserves existing
+    -- settings without making them the fallback for every character.
+    local migrationKey = getMigrationKey(playerId)
+    if migrationKey and GetResourceKvpString(migrationKey) ~= '1' then
+        local legacySettings = readPersistentSettings(getLegacyPersistenceKey(playerId))
+        if legacySettings then
+            SetResourceKvp(key, json.encode(legacySettings))
+        end
+
+        SetResourceKvp(migrationKey, '1')
+        return legacySettings or normalizeSettings({})
     end
 
-    return normalizeSettings(decoded)
+    return normalizeSettings({})
 end
 
 local function savePersistentSettings(playerId, settings)
@@ -188,24 +256,22 @@ local function broadcastPlayerSettings(playerId, includeLocalSettings)
     end
 end
 
-local function refreshCharacterName(playerId, notifyPlayer)
-    local settings = playerSettings[playerId]
-    if not settings then
-        settings = loadPersistentSettings(playerId)
-        playerSettings[playerId] = settings
+local function refreshCharacterSettings(playerId, notifyPlayer)
+    local characterId = getCharacterId(playerId)
+    if not characterId then
+        return
     end
 
+    local settings = loadPersistentSettings(playerId)
     local characterName = getCharacterName(playerId)
-    if characterName == '' then
-        return
+    if characterName ~= '' and settings.characterName ~= characterName then
+        settings.characterName = characterName
+        savePersistentSettings(playerId, settings)
     end
 
-    if settings.characterName == characterName then
-        return
-    end
-
-    settings.characterName = characterName
-    savePersistentSettings(playerId, settings)
+    playerSettings[playerId] = settings
+    activePlayers[playerId] = true
+    reconfigure(playerId)
     broadcastPlayerSettings(playerId, notifyPlayer)
 end
 
@@ -268,6 +334,23 @@ AddEventHandler("playerDropped", function()
     TriggerClientEvent('playernames:settingsUpdated', -1, source, false)
 end)
 
+local function unloadCharacter(playerId)
+    curTags[playerId] = nil
+    activePlayers[playerId] = nil
+    playerSettings[playerId] = nil
+    nameVisibilityOverrides[playerId] = nil
+    TriggerClientEvent('playernames:settingsUpdated', -1, playerId, false)
+end
+
+AddEventHandler('QBCore:Server:OnPlayerUnload', function(playerId)
+    playerId = tonumber(playerId) or tonumber(source)
+    if not playerId then
+        return
+    end
+
+    unloadCharacter(playerId)
+end)
+
 RegisterNetEvent('playernames:init')
 AddEventHandler('playernames:init', function()
     local playerId = source
@@ -307,7 +390,7 @@ end)
 RegisterNetEvent('QBCore:Server:OnPlayerLoaded')
 AddEventHandler('QBCore:Server:OnPlayerLoaded', function()
     local playerId = source
-    refreshCharacterName(playerId, true)
+    refreshCharacterSettings(playerId, true)
 end)
 
 detectUpdates()
