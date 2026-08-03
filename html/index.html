@@ -103,19 +103,75 @@
             </form>
         </main>
 
-        <aside class="preview-panel" aria-label="名前プレビュー">
-            <header class="preview-panel-header">
-                <p class="eyebrow">PREVIEW</p>
-                <h2 class="preview-panel-title">名前プレビュー</h2>
-            </header>
-            <div class="preview-panel-body">
-                <div class="name-preview" aria-live="polite">
-                    <div id="preview-status" class="name-preview-status" hidden></div>
-                    <div id="preview-name" class="name-preview-name">キャラクターネーム</div>
+        <div class="side-panels">
+            <details class="preview-panel" aria-label="名前プレビュー">
+                <summary class="preview-panel-header">
+                    <div>
+                        <p class="eyebrow">PREVIEW</p>
+                        <h2 class="preview-panel-title">名前プレビュー</h2>
+                    </div>
+                    <span class="collapse-icon" aria-hidden="true">⌄</span>
+                </summary>
+                <div class="preview-panel-body">
+                    <div class="name-preview" aria-live="polite">
+                        <div id="preview-status" class="name-preview-status" hidden></div>
+                        <div id="preview-name" class="name-preview-name">キャラクターネーム</div>
+                    </div>
+                    <p class="field-help">現在の入力内容をリアルタイムで表示します。</p>
                 </div>
-                <p class="field-help">現在の入力内容をリアルタイムで表示します。</p>
-            </div>
-        </aside>
+            </details>
+
+            <details class="preset-panel" aria-label="名前プリセット">
+                <summary class="preset-panel-header">
+                    <div>
+                        <p class="eyebrow">PRESETS</p>
+                        <h2 class="preset-panel-title">名前プリセット</h2>
+                        <p class="field-help">名前・色・ステータスを3種類まで保存できます。</p>
+                    </div>
+                    <span class="collapse-icon" aria-hidden="true">⌄</span>
+                </summary>
+                <div id="preset-list" class="preset-panel-body">
+                    <article class="preset-card is-empty" data-preset-slot="1">
+                        <div class="preset-card-header">
+                            <span class="preset-slot-title">PRESET 1</span>
+                            <span class="preset-state" data-preset-state>未登録</span>
+                        </div>
+                        <p class="preset-summary" data-preset-summary>この枠は空です。</p>
+                        <div class="preset-actions">
+                            <button class="button button-small button-secondary" type="button" data-preset-action="save" data-preset-slot="1">現在の設定を保存</button>
+                            <button class="button button-small button-primary" type="button" data-preset-action="apply" data-preset-slot="1" disabled>適用</button>
+                            <button class="button button-small button-danger" type="button" data-preset-action="delete" data-preset-slot="1" disabled>削除</button>
+                        </div>
+                    </article>
+
+                    <article class="preset-card is-empty" data-preset-slot="2">
+                        <div class="preset-card-header">
+                            <span class="preset-slot-title">PRESET 2</span>
+                            <span class="preset-state" data-preset-state>未登録</span>
+                        </div>
+                        <p class="preset-summary" data-preset-summary>この枠は空です。</p>
+                        <div class="preset-actions">
+                            <button class="button button-small button-secondary" type="button" data-preset-action="save" data-preset-slot="2">現在の設定を保存</button>
+                            <button class="button button-small button-primary" type="button" data-preset-action="apply" data-preset-slot="2" disabled>適用</button>
+                            <button class="button button-small button-danger" type="button" data-preset-action="delete" data-preset-slot="2" disabled>削除</button>
+                        </div>
+                    </article>
+
+                    <article class="preset-card is-empty" data-preset-slot="3">
+                        <div class="preset-card-header">
+                            <span class="preset-slot-title">PRESET 3</span>
+                            <span class="preset-state" data-preset-state>未登録</span>
+                        </div>
+                        <p class="preset-summary" data-preset-summary>この枠は空です。</p>
+                        <div class="preset-actions">
+                            <button class="button button-small button-secondary" type="button" data-preset-action="save" data-preset-slot="3">現在の設定を保存</button>
+                            <button class="button button-small button-primary" type="button" data-preset-action="apply" data-preset-slot="3" disabled>適用</button>
+                            <button class="button button-small button-danger" type="button" data-preset-action="delete" data-preset-slot="3" disabled>削除</button>
+                        </div>
+                    </article>
+                </div>
+            </details>
+        </div>
     </div>
 
     <script src="app.js"></script>

@@ -4,6 +4,7 @@ local curTags = {}
 local activePlayers = {}
 local playerSettings = {}
 local nameVisibilityOverrides = {}
+local PRESET_COUNT = 3
 
 local legacyTextColors = {
     white = '#f0f0f0',
@@ -151,8 +152,41 @@ local function trimStatus(value)
     return truncateUtf8(value, 32)
 end
 
-local function normalizeSettings(settings)
+local function normalizePreset(preset)
+    preset = type(preset) == 'table' and preset or {}
+
+    return {
+        status = trimStatus(preset.status),
+        statusColor = normalizeTextColor(preset.statusColor),
+        displayName = trimDisplayName(preset.displayName),
+        nameColor = normalizeTextColor(preset.nameColor)
+    }
+end
+
+local function normalizePresets(presets)
+    local normalized = {}
+
+    if type(presets) ~= 'table' then
+        return normalized
+    end
+
+    for slot = 1, PRESET_COUNT do
+        local preset = presets[tostring(slot)] or presets[slot]
+        if type(preset) == 'table' then
+            normalized[tostring(slot)] = normalizePreset(preset)
+        end
+    end
+
+    return normalized
+end
+
+local function normalizeSettings(settings, fallbackPresets)
     settings = type(settings) == 'table' and settings or {}
+
+    local presets = settings.presets
+    if presets == nil then
+        presets = fallbackPresets
+    end
 
     local achievement = settings.achievement
     if achievement ~= 'coming_soon' then
@@ -168,7 +202,8 @@ local function normalizeSettings(settings)
         showSelf = settings.showSelf == true,
         showOthers = settings.showOthers == true,
         maxVisibleNames = normalizeVisibleNameLimit(settings.maxVisibleNames),
-        characterName = type(settings.characterName) == 'string' and settings.characterName or ''
+        characterName = type(settings.characterName) == 'string' and settings.characterName or '',
+        presets = normalizePresets(presets)
     }
 end
 
@@ -254,6 +289,15 @@ local function broadcastPlayerSettings(playerId, includeLocalSettings)
     if includeLocalSettings then
         TriggerClientEvent('playernames:settingsUpdated', playerId, playerId, settings)
     end
+end
+
+local function broadcastPrivatePresets(playerId)
+    local settings = playerSettings[playerId]
+    if not settings then
+        return
+    end
+
+    TriggerClientEvent('playernames:presetsUpdated', playerId, settings.presets or {})
 end
 
 local function refreshCharacterSettings(playerId, notifyPlayer)
@@ -378,13 +422,88 @@ end)
 RegisterNetEvent('playernames:saveSettings')
 AddEventHandler('playernames:saveSettings', function(settings)
     local playerId = source
-    local normalized = normalizeSettings(settings)
+    local currentSettings = playerSettings[playerId]
+    local normalized = normalizeSettings(settings, currentSettings and currentSettings.presets)
     normalized.characterName = getCharacterName(playerId)
 
     playerSettings[playerId] = normalized
     savePersistentSettings(playerId, normalized)
 
     broadcastPlayerSettings(playerId, true)
+end)
+
+local function normalizePresetSlot(value)
+    local slot = tonumber(value)
+    if not slot or slot % 1 ~= 0 then
+        return nil
+    end
+
+    slot = math.floor(slot)
+    return slot >= 1 and slot <= PRESET_COUNT and slot or nil
+end
+
+RegisterNetEvent('playernames:savePreset')
+AddEventHandler('playernames:savePreset', function(slot, preset)
+    local playerId = source
+    local settings = playerSettings[playerId]
+    local presetSlot = normalizePresetSlot(slot)
+
+    if not settings or not presetSlot or type(preset) ~= 'table' then
+        return
+    end
+
+    settings.presets = settings.presets or {}
+    settings.presets[tostring(presetSlot)] = normalizePreset(preset)
+    savePersistentSettings(playerId, settings)
+    broadcastPrivatePresets(playerId)
+end)
+
+RegisterNetEvent('playernames:applyPreset')
+AddEventHandler('playernames:applyPreset', function(slot)
+    local playerId = source
+    local settings = playerSettings[playerId]
+    local presetSlot = normalizePresetSlot(slot)
+
+    if not settings or not presetSlot then
+        return
+    end
+
+    local preset = settings.presets and settings.presets[tostring(presetSlot)]
+    if not preset then
+        return
+    end
+
+    local applied = normalizeSettings({
+        status = preset.status,
+        statusColor = preset.statusColor,
+        displayName = preset.displayName,
+        nameColor = preset.nameColor,
+        achievement = settings.achievement,
+        showSelf = settings.showSelf,
+        showOthers = settings.showOthers,
+        maxVisibleNames = settings.maxVisibleNames,
+        characterName = settings.characterName,
+        presets = settings.presets
+    })
+
+    playerSettings[playerId] = applied
+    savePersistentSettings(playerId, applied)
+    broadcastPlayerSettings(playerId, true)
+end)
+
+RegisterNetEvent('playernames:deletePreset')
+AddEventHandler('playernames:deletePreset', function(slot)
+    local playerId = source
+    local settings = playerSettings[playerId]
+    local presetSlot = normalizePresetSlot(slot)
+
+    if not settings or not presetSlot or not settings.presets then
+        return
+    end
+
+    settings.presets[tostring(presetSlot)] = nil
+    savePersistentSettings(playerId, settings)
+    broadcastPrivatePresets(playerId)
 end)
 
 RegisterNetEvent('QBCore:Server:OnPlayerLoaded')

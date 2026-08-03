@@ -12,6 +12,7 @@ local LOS_INTERVAL = 125
 local VOICE_INTERVAL = 50
 local IDLE_UPDATE_INTERVAL = 500
 local ACTIVE_UPDATE_INTERVAL = 50
+local PRESET_COUNT = 3
 local DISPLAY_DISTANCE_SQUARED = 12.0 * 12.0
 local STATUS_HEIGHT_OFFSET = 1.15
 local STATUS_TEXT_SCALE_MAX = 0.38
@@ -40,6 +41,7 @@ local localSettings = {
     showOthers = false,
     maxVisibleNames = 5
 }
+local localPresets = {}
 
 local textColors = {
     white = { hud = 1, red = 240, green = 240, blue = 240 },
@@ -89,6 +91,64 @@ local function normalizeVisibleNameLimit(value)
 
     limit = math.floor(limit)
     return math.max(1, math.min(20, limit))
+end
+
+local function truncateUtf8(value, maxCharacters)
+    local ok, nextByte = pcall(utf8.offset, value, maxCharacters + 1)
+    if ok and nextByte then
+        return value:sub(1, nextByte - 1)
+    end
+
+    return ok and value or value:sub(1, maxCharacters)
+end
+
+local function trimLocalText(value)
+    if type(value) ~= 'string' then
+        return ''
+    end
+
+    return value:gsub('[\r\n\t]', ' '):match('^%s*(.-)%s*$') or ''
+end
+
+local function normalizePresetSlot(value)
+    local slot = tonumber(value)
+    if not slot or slot % 1 ~= 0 then
+        return nil
+    end
+
+    slot = math.floor(slot)
+    return slot >= 1 and slot <= PRESET_COUNT and slot or nil
+end
+
+local function normalizePreset(preset)
+    preset = type(preset) == 'table' and preset or {}
+
+    local status = trimLocalText(preset.status)
+    local displayName = trimLocalText(preset.displayName)
+
+    return {
+        status = truncateUtf8(status, 32),
+        statusColor = normalizeTextColor(preset.statusColor),
+        displayName = truncateUtf8(displayName, 32),
+        nameColor = normalizeTextColor(preset.nameColor)
+    }
+end
+
+local function normalizeLocalPresets(presets)
+    local normalized = {}
+
+    if type(presets) ~= 'table' then
+        return normalized
+    end
+
+    for slot = 1, PRESET_COUNT do
+        local preset = presets[tostring(slot)] or presets[slot]
+        if type(preset) == 'table' then
+            normalized[tostring(slot)] = normalizePreset(preset)
+        end
+    end
+
+    return normalized
 end
 
 local settingsMenuOpen = false
@@ -298,7 +358,8 @@ local function openSettingsMenu()
     SetNuiFocus(true, true)
     SendNUIMessage({
         action = 'open',
-        settings = localSettings
+        settings = localSettings,
+        presets = localPresets
     })
 
     -- The NUI page may still be initializing on the first command after resource start.
@@ -307,7 +368,8 @@ local function openSettingsMenu()
         if settingsMenuOpen then
             SendNUIMessage({
                 action = 'open',
-                settings = localSettings
+                settings = localSettings,
+                presets = localPresets
             })
         end
     end)
@@ -316,23 +378,11 @@ end
 local function normalizeLocalSettings(settings)
     settings = type(settings) == 'table' and settings or {}
 
-    local status = type(settings.status) == 'string' and settings.status or ''
-    status = status:gsub('[\r\n\t]', ' '):match('^%s*(.-)%s*$') or ''
-
-    local displayName = type(settings.displayName) == 'string' and settings.displayName or ''
-    displayName = displayName:gsub('[\r\n\t]', ' '):match('^%s*(.-)%s*$') or ''
+    local status = trimLocalText(settings.status)
+    local displayName = trimLocalText(settings.displayName)
 
     local statusColor = normalizeTextColor(settings.statusColor)
     local nameColor = normalizeTextColor(settings.nameColor)
-
-    local function truncateUtf8(value, maxCharacters)
-        local ok, nextByte = pcall(utf8.offset, value, maxCharacters + 1)
-        if ok and nextByte then
-            return value:sub(1, nextByte - 1)
-        end
-
-        return ok and value or value:sub(1, maxCharacters)
-    end
 
     return {
         status = truncateUtf8(status, 32),
@@ -357,7 +407,8 @@ RegisterNUICallback('ready', function(_, cb)
     if settingsMenuOpen then
         SendNUIMessage({
             action = 'open',
-            settings = localSettings
+            settings = localSettings,
+            presets = localPresets
         })
     end
 
@@ -388,6 +439,51 @@ RegisterNUICallback('saveSettings', function(data, cb)
     cb({ ok = true })
 end)
 
+RegisterNUICallback('savePreset', function(data, cb)
+    local slot = normalizePresetSlot(data and data.slot)
+    if not slot then
+        cb({ ok = false })
+        return
+    end
+
+    TriggerServerEvent('playernames:savePreset', slot, normalizePreset(data))
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('applyPreset', function(data, cb)
+    local slot = normalizePresetSlot(data and data.slot)
+    if not slot then
+        cb({ ok = false })
+        return
+    end
+
+    TriggerServerEvent('playernames:applyPreset', slot)
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('deletePreset', function(data, cb)
+    local slot = normalizePresetSlot(data and data.slot)
+    if not slot then
+        cb({ ok = false })
+        return
+    end
+
+    TriggerServerEvent('playernames:deletePreset', slot)
+    cb({ ok = true })
+end)
+
+RegisterNetEvent('playernames:presetsUpdated')
+AddEventHandler('playernames:presetsUpdated', function(presets)
+    localPresets = normalizeLocalPresets(presets)
+
+    if settingsMenuOpen then
+        SendNUIMessage({
+            action = 'presetsUpdated',
+            presets = localPresets
+        })
+    end
+end)
+
 RegisterNetEvent('playernames:settingsUpdated')
 AddEventHandler('playernames:settingsUpdated', function(serverId, settings)
     serverId = tonumber(serverId)
@@ -412,6 +508,7 @@ AddEventHandler('playernames:settingsUpdated', function(serverId, settings)
                 showOthers = false,
                 maxVisibleNames = 5
             }
+            localPresets = {}
             localNameVisible = nil
         end
 
@@ -449,10 +546,20 @@ AddEventHandler('playernames:settingsUpdated', function(serverId, settings)
 
             localSettings = normalized
 
+            if settings.presets ~= nil then
+                localPresets = normalizeLocalPresets(settings.presets)
+            end
+
             if localSettings.showSelf ~= previousShowSelf
                 or localSettings.showOthers ~= previousShowOthers then
                 removeHiddenPlayerTags()
             end
+
+            SendNUIMessage({
+                action = 'settingsUpdated',
+                settings = localSettings,
+                presets = localPresets
+            })
         end
 
         -- Only the tag belonging to the changed server ID needs a rename.

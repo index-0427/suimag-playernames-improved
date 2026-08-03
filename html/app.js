@@ -18,6 +18,8 @@
     var maxVisibleNamesValue = document.getElementById('max-visible-names-value');
     var previewStatus = document.getElementById('preview-status');
     var previewName = document.getElementById('preview-name');
+    var presetList = document.getElementById('preset-list');
+    var presetCount = 3;
 
     var defaults = {
         status: '',
@@ -88,6 +90,43 @@
         return value + '人';
     }
 
+    function getPreset(presets, slot) {
+        if (!presets || typeof presets !== 'object') {
+            return undefined;
+        }
+
+        return presets[String(slot)] || presets[slot];
+    }
+
+    function normalizePreset(preset) {
+        preset = preset || {};
+
+        return {
+            status: typeof preset.status === 'string' ? preset.status.slice(0, 32) : '',
+            statusColor: normalizeColor(preset.statusColor),
+            displayName: typeof preset.displayName === 'string' ? preset.displayName.slice(0, 32) : '',
+            nameColor: normalizeColor(preset.nameColor)
+        };
+    }
+
+    function normalizePresets(presets) {
+        var normalized = {};
+
+        for (var slot = 1; slot <= presetCount; slot += 1) {
+            var preset = getPreset(presets, slot);
+            if (preset && typeof preset === 'object') {
+                normalized[String(slot)] = normalizePreset(preset);
+            }
+        }
+
+        return normalized;
+    }
+
+    function formatPresetSummary(preset) {
+        var name = preset.displayName || 'キャラクターネーム';
+        return preset.status ? name + ' / ' + preset.status : name;
+    }
+
     function updatePreview() {
         var statusValue = status.value.trim();
         var nameValue = displayName.value.trim();
@@ -107,6 +146,26 @@
         updatePreview();
     }
 
+    function applyPresets(presets) {
+        var normalized = normalizePresets(presets);
+
+        for (var slot = 1; slot <= presetCount; slot += 1) {
+            var card = presetList.querySelector('.preset-card[data-preset-slot="' + slot + '"]');
+            var state = card.querySelector('[data-preset-state]');
+            var summary = card.querySelector('[data-preset-summary]');
+            var applyButton = card.querySelector('[data-preset-action="apply"]');
+            var deleteButton = card.querySelector('[data-preset-action="delete"]');
+            var preset = normalized[String(slot)];
+            var isRegistered = !!preset;
+
+            card.classList.toggle('is-empty', !isRegistered);
+            state.textContent = isRegistered ? '登録済み' : '未登録';
+            summary.textContent = isRegistered ? formatPresetSummary(preset) : 'この枠は空です。';
+            applyButton.disabled = !isRegistered;
+            deleteButton.disabled = !isRegistered;
+        }
+    }
+
     function applySettings(settings) {
         settings = settings || {};
         status.value = typeof settings.status === 'string' ? settings.status.slice(0, 32) : defaults.status;
@@ -121,8 +180,9 @@
         updateColorValues();
     }
 
-    function open(settings) {
+    function open(settings, presets) {
         applySettings(settings);
+        applyPresets(presets || (settings && settings.presets));
         app.classList.add('is-open');
         app.setAttribute('aria-hidden', 'false');
         window.setTimeout(function () {
@@ -147,6 +207,32 @@
     statusColor.addEventListener('input', updateColorValues);
     nameColor.addEventListener('input', updateColorValues);
     maxVisibleNames.addEventListener('input', updateColorValues);
+
+    presetList.addEventListener('click', function (event) {
+        var action = event.target.getAttribute('data-preset-action');
+        if (!action) {
+            return;
+        }
+
+        var slot = Number(event.target.getAttribute('data-preset-slot'));
+        if (!Number.isFinite(slot) || slot < 1 || slot > presetCount) {
+            return;
+        }
+
+        if (action === 'save') {
+            post('savePreset', {
+                slot: slot,
+                status: status.value,
+                statusColor: normalizeColor(statusColor.value),
+                displayName: displayName.value,
+                nameColor: normalizeColor(nameColor.value)
+            });
+        } else if (action === 'apply') {
+            post('applyPreset', { slot: slot });
+        } else if (action === 'delete') {
+            post('deletePreset', { slot: slot });
+        }
+    });
 
     form.addEventListener('submit', function (event) {
         event.preventDefault();
@@ -177,7 +263,14 @@
         var message = event.data || {};
 
         if (message.action === 'open') {
-            open(message.settings);
+            open(message.settings, message.presets);
+        } else if (message.action === 'settingsUpdated') {
+            applySettings(message.settings);
+            if (message.presets !== undefined) {
+                applyPresets(message.presets);
+            }
+        } else if (message.action === 'presetsUpdated') {
+            applyPresets(message.presets);
         } else if (message.action === 'close') {
             close(false);
         }

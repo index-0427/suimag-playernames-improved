@@ -70,12 +70,25 @@ button {
     overflow: hidden;
 }
 
-.preview-panel {
+.side-panels {
     position: relative;
     display: flex;
+    flex: 0 1 280px;
+    width: min(100%, 280px);
     max-height: calc(100vh - 48px);
     flex-direction: column;
-    width: min(100%, 280px);
+    gap: 18px;
+    overflow-y: auto;
+}
+
+.preview-panel,
+.preset-panel {
+    position: relative;
+    display: flex;
+    flex: 0 0 auto;
+    max-height: calc(100vh - 48px);
+    flex-direction: column;
+    width: 100%;
     border: 1px solid rgba(157, 178, 208, 0.2);
     border-radius: 14px;
     background: #151b25;
@@ -84,23 +97,64 @@ button {
     overflow: hidden;
 }
 
-.preview-panel-header {
+.preview-panel-header,
+.preset-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
     padding: 22px 22px 18px;
     border-bottom: 1px solid rgba(157, 178, 208, 0.13);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
 }
 
-.preview-panel-header .eyebrow {
+.preview-panel-header::-webkit-details-marker,
+.preset-panel-header::-webkit-details-marker {
+    display: none;
+}
+
+.preview-panel-header:focus-visible,
+.preset-panel-header:focus-visible {
+    outline: 2px solid rgba(110, 168, 254, 0.65);
+    outline-offset: -3px;
+}
+
+.collapse-icon {
+    flex: 0 0 auto;
+    color: #8e9bad;
+    font-size: 21px;
+    line-height: 1;
+    transform: translateY(1px);
+    transition: transform 150ms ease, color 120ms ease;
+}
+
+.preview-panel-header:hover .collapse-icon,
+.preset-panel-header:hover .collapse-icon {
+    color: #ffffff;
+}
+
+.preview-panel[open] .collapse-icon,
+.preset-panel[open] .collapse-icon {
+    transform: rotate(180deg) translateY(-1px);
+}
+
+.preview-panel-header .eyebrow,
+.preset-panel-header .eyebrow {
     margin-bottom: 6px;
 }
 
-.preview-panel-title {
+.preview-panel-title,
+.preset-panel-title {
     margin: 0;
     color: #f4f7fb;
     font-size: 18px;
     font-weight: 700;
 }
 
-.preview-panel-body {
+.preview-panel-body,
+.preset-panel-body {
     padding: 22px;
     overflow-y: auto;
 }
@@ -233,6 +287,88 @@ select {
 
 .preview-panel .name-preview {
     min-height: 180px;
+}
+
+.preset-panel-body {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+}
+
+.preset-card {
+    display: grid;
+    gap: 9px;
+    padding: 13px;
+    border: 1px solid rgba(157, 178, 208, 0.18);
+    border-radius: 10px;
+    background: rgba(9, 13, 21, 0.34);
+}
+
+.preset-card.is-empty {
+    border-color: rgba(157, 178, 208, 0.12);
+}
+
+.preset-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.preset-slot-title {
+    color: #e7ecf5;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.preset-state {
+    color: #768399;
+    font-size: 10px;
+}
+
+.preset-summary {
+    margin: 0;
+    overflow: hidden;
+    color: #aeb9c9;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preset-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.button.button-small {
+    min-width: 0;
+    min-height: 31px;
+    height: auto;
+    flex: 1 1 70px;
+    padding: 6px 8px;
+    font-size: 10px;
+    line-height: 1.25;
+}
+
+.button-danger {
+    border: 1px solid rgba(224, 50, 50, 0.45);
+    background: transparent;
+    color: #f28b8b;
+}
+
+.button-danger:hover,
+.button-danger:focus-visible {
+    border-color: rgba(224, 50, 50, 0.7);
+    background: rgba(224, 50, 50, 0.12);
+    color: #ffc1c1;
+    outline: none;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
 }
 
 .name-preview-status,
@@ -471,12 +607,20 @@ input[type="range"]:focus-visible {
     }
 
     .panel,
-    .preview-panel {
+    .side-panels,
+    .preview-panel,
+    .preset-panel {
         max-height: none;
         width: 100%;
     }
 
-    .preview-panel {
+    .side-panels {
+        flex: 0 0 auto;
+        overflow: visible;
+    }
+
+    .preview-panel,
+    .preset-panel {
         flex: 0 0 auto;
     }
 }
